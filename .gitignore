@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+*.user
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Agent artifacts — never committed
+.claude/
+CLAUDE.md
+.codex/
+*.agent-scratch/

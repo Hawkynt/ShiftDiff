@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ShiftDiff.Cli/ShiftDiff.Cli.csproj" />
+    <Project Path="src/ShiftDiff.Core/ShiftDiff.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ShiftDiff.Core.Tests/ShiftDiff.Core.Tests.csproj" />
+  </Folder>
+</Solution>
