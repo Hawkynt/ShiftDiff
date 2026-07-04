@@ -308,6 +308,41 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void ApplyFileExact_HunkSubsetSelectedViaWithExpression_OnlyAppliesSelectedHunk()
+    {
+        // FR-022 "selected diff changes": no dedicated API needed — a caller
+        // filters UnifiedDiffFile.Hunks down to the desired subset via a
+        // `with` expression before calling ApplyFileExact, same precedent as
+        // FR-024's "selected changes only" export. Locks in the finding with
+        // an actual regression test rather than leaving it an unverified note.
+        var source = new[] { "a", "b", "c", "d" };
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/f", "b/f"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "a"),
+                        new(UnifiedDiffLineKind.Added, "A"),
+                    }),
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(4, 1, 4, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "d"),
+                        new(UnifiedDiffLineKind.Added, "D"),
+                    }),
+            });
+
+        var selectedFile = file with { Hunks = new[] { file.Hunks[1] } };
+        var result = PatchApplier.ApplyFileExact(source, selectedFile);
+
+        Assert.Equal(new[] { "a", "b", "c", "D" }, result);
+    }
+
+    [Fact]
     public void ApplyPatchExact_MultipleFiles_EachRoutedToItsOwnSourceByPath()
     {
         var fileA = new UnifiedDiffFile(

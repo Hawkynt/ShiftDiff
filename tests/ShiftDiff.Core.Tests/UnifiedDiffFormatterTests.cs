@@ -91,6 +91,42 @@ public class UnifiedDiffFormatterTests
     }
 
     [Fact]
+    public void HunkSubsetSelectedViaWithExpression_OnlyEmitsSelectedHunk()
+    {
+        // FR-024 "selected changes only" export: no dedicated API needed — a
+        // caller filters UnifiedDiffFile.Hunks down to the desired subset via
+        // a `with` expression before calling Format. Locks in the 798-dream
+        // finding with an actual regression test (previously assessed, never
+        // verified by a test).
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("old.txt", "new.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 2, 1, 2),
+                    new[]
+                    {
+                        new UnifiedDiffLine(UnifiedDiffLineKind.Context, "a"),
+                        new UnifiedDiffLine(UnifiedDiffLineKind.Removed, "b"),
+                    }),
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(10, 2, 10, 2),
+                    new[]
+                    {
+                        new UnifiedDiffLine(UnifiedDiffLineKind.Context, "x"),
+                        new UnifiedDiffLine(UnifiedDiffLineKind.Added, "y"),
+                    }),
+            });
+
+        var selectedFile = file with { Hunks = new[] { file.Hunks[1] } };
+        var lines = UnifiedDiffFormatter.Format(selectedFile);
+
+        Assert.Equal(
+            new[] { "--- old.txt", "+++ new.txt", "@@ -10,2 +10,2 @@", " x", "+y" },
+            lines);
+    }
+
+    [Fact]
     public void MultipleFilesInOnePatch_FormatsEachFileBackToBack()
     {
         var patch = new UnifiedDiffPatch(new[]
