@@ -16,6 +16,8 @@ public enum PatchApplicationConfidence
 
 public sealed record PatchApplicationResult(IReadOnlyList<string> Lines, PatchApplicationConfidence Confidence);
 
+public sealed record PatchApplicationCandidate(int LineNumber, double Score, Confidence Confidence);
+
 public static class PatchApplier
 {
     public static IReadOnlyList<string> ApplyHunkExact(IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk)
@@ -186,6 +188,37 @@ public static class PatchApplier
         return new PatchApplicationResult(result, PatchApplicationConfidence.Moved);
     }
 
+    // FR-023 (Patch Conflict Handling), first slice: surfaces every viable
+    // block-identity match instead of silently committing to the single best
+    // one the way ApplyHunkSemantic does. A caller (CLI/UI, not this library)
+    // uses this to detect ambiguity — 2+ candidates — and drive "mark hunk as
+    // uncertain, show candidate locations, explain why confidence is low".
+    // Deliberately additive: ApplyHunkSemantic/ApplyFileSemantic are untouched,
+    // so nothing that already depends on their throw-or-single-pick contract
+    // changes. Skip/manual-edit/select-location are UI concerns and stay out
+    // of Core's scope. Pure insertions (no Removed/Context lines) have no
+    // "location" to be ambiguous about, so they yield no candidates.
+    public static IReadOnlyList<PatchApplicationCandidate> FindSemanticCandidates(
+        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk, DetectionMode mode = DetectionMode.Balanced)
+    {
+        var oldLines = hunk.Lines
+            .Where(line => line.Kind is UnifiedDiffLineKind.Context or UnifiedDiffLineKind.Removed)
+            .ToList();
+        if (oldLines.Count == 0)
+        {
+            return Array.Empty<PatchApplicationCandidate>();
+        }
+
+        var hunkOldContent = oldLines.Select(line => line.Content).ToArray();
+        var sourceArray = sourceLines as string[] ?? sourceLines.ToArray();
+
+        return FindBlockMatchCandidates(hunkOldContent, sourceArray, mode)
+            .OrderByDescending(candidate => candidate.Score)
+            .Select(candidate => new PatchApplicationCandidate(
+                candidate.StartIndex + 1, candidate.Score, ConfidenceClassifier.Classify(candidate.Score)))
+            .ToList();
+    }
+
     public static PatchApplicationResult ApplyFileSemantic(
         IReadOnlyList<string> sourceLines, UnifiedDiffFile file, DetectionMode mode = DetectionMode.Balanced)
     {
@@ -224,24 +257,45 @@ public static class PatchApplier
     private static int? FindBestBlockMatch(
         string[] hunkOldContent, string[] sourceArray, int preferredIndex, DetectionMode mode)
     {
+        int? bestStartIndex = null;
+        var bestScore = -1.0;
+        var bestDistance = int.MaxValue;
+
+        foreach (var candidate in FindBlockMatchCandidates(hunkOldContent, sourceArray, mode))
+        {
+            var distance = Math.Abs(candidate.StartIndex - preferredIndex);
+            if (candidate.Score > bestScore || (candidate.Score == bestScore && distance < bestDistance))
+            {
+                bestScore = candidate.Score;
+                bestDistance = distance;
+                bestStartIndex = candidate.StartIndex;
+            }
+        }
+
+        return bestStartIndex;
+    }
+
+    private readonly record struct BlockMatchCandidate(int StartIndex, double Score);
+
+    private static List<BlockMatchCandidate> FindBlockMatchCandidates(
+        string[] hunkOldContent, string[] sourceArray, DetectionMode mode)
+    {
+        var results = new List<BlockMatchCandidate>();
+
         var length = hunkOldContent.Length;
         var lastPossibleStart = sourceArray.Length - length;
         if (lastPossibleStart < 0)
         {
-            return null;
+            return results;
         }
 
         var candidates = BlockBuilder.Build(hunkOldContent, sourceArray);
         if (candidates.Length == 0)
         {
-            return null;
+            return results;
         }
 
         var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
-
-        int? bestStartIndex = null;
-        var bestScore = -1.0;
-        var bestDistance = int.MaxValue;
         var consideredStartIndices = new HashSet<int>();
 
         foreach (var candidate in candidates)
@@ -259,16 +313,10 @@ public static class PatchApplier
                 continue;
             }
 
-            var distance = Math.Abs(startIndex - preferredIndex);
-            if (score > bestScore || (score == bestScore && distance < bestDistance))
-            {
-                bestScore = score;
-                bestDistance = distance;
-                bestStartIndex = startIndex;
-            }
+            results.Add(new BlockMatchCandidate(startIndex, score));
         }
 
-        return bestStartIndex;
+        return results;
     }
 
     private enum MatchKind

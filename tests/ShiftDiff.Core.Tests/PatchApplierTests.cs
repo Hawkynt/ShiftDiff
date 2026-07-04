@@ -476,4 +476,118 @@ public class PatchApplierTests
 
         Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyHunkSemantic(source, hunk));
     }
+
+    [Fact]
+    public void FindSemanticCandidates_BlockDuplicatedAtTwoLocations_ReturnsEmptyNotTwoCandidates()
+    {
+        // Naively expected this to surface 2 ambiguous candidates — it does
+        // not. AnchorDetector marks a line Weak (not Strong) the moment it
+        // appears more than once anywhere in the source (its own FR-016
+        // false-positive control), and BlockBuilder only ever pairs Strong
+        // anchors. A verbatim-duplicated block therefore has zero lines
+        // eligible to become an anchor at either occurrence, so BlockBuilder
+        // yields no candidates at all for it — not two. Verified empirically
+        // (this test failed with "Expected 2, Actual 0" before being
+        // corrected to match reality): under the current architecture, a
+        // fully-duplicated block is reported as "no match" by semantic mode,
+        // never as "ambiguous, pick one of two". Closing that gap (e.g. by
+        // relaxing the Strong-anchor requirement specifically for candidate
+        // *discovery*, while keeping it for scoring) is a separate, larger
+        // design question — not part of this slice.
+        var source = new[]
+        {
+            "filler line number one long enough content",
+            "filler line number two long enough content",
+            "block target Alpha long enough content here",
+            "block target Beta long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number five long enough content",
+            "filler line number six long enough content",
+            "block target Alpha long enough content here",
+            "block target Beta long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number ten long enough content",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+
+        var candidates = PatchApplier.FindSemanticCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
+
+    [Fact]
+    public void FindSemanticCandidates_UnambiguousMove_ReturnsSingleCandidateMatchingApplyHunkSemantic()
+    {
+        var source = new[]
+        {
+            "filler line number one long enough content",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "filler line number five long enough content",
+            "block target Alpha long enough content here",
+            "block target Beta long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number eight long enough content",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+
+        var candidates = PatchApplier.FindSemanticCandidates(source, hunk);
+
+        Assert.Single(candidates);
+        Assert.Equal(6, candidates[0].LineNumber);
+    }
+
+    [Fact]
+    public void FindSemanticCandidates_BlockContentAbsentEverywhere_ReturnsEmpty()
+    {
+        var source = new[]
+        {
+            "totally unrelated line content number one",
+            "totally unrelated line content number two",
+            "totally unrelated line content number three",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+
+        var candidates = PatchApplier.FindSemanticCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
+
+    [Fact]
+    public void FindSemanticCandidates_PureInsertionHunk_ReturnsEmpty()
+    {
+        var source = new[] { "a", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 0, 1, 1),
+            new UnifiedDiffLine[] { new(UnifiedDiffLineKind.Added, "new") });
+
+        var candidates = PatchApplier.FindSemanticCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
 }
