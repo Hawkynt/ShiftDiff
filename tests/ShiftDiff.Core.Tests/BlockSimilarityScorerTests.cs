@@ -170,4 +170,104 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(1.0, result);
     }
+
+    [Fact]
+    public void TokenShingleSimilarity_returns_one_for_identical_content()
+    {
+        var oldLines = new[]
+        {
+            "foo bar baz qux",
+        };
+        var newLines = new[]
+        {
+            "foo bar baz qux",
+        };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var result = BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void TokenShingleSimilarity_returns_zero_for_disjoint_content()
+    {
+        var oldLines = new[]
+        {
+            "foo bar baz qux",
+        };
+        var newLines = new[]
+        {
+            "zeta eta theta iota",
+        };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var result = BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines);
+
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void TokenShingleSimilarity_returns_exact_fraction_for_partial_overlap()
+    {
+        var oldLines = new[]
+        {
+            "alpha beta gamma delta epsilon",
+        };
+        var newLines = new[]
+        {
+            "beta gamma delta epsilon zeta",
+        };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var result = BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines);
+
+        Assert.Equal(0.5, result);
+    }
+
+    [Fact]
+    public void TokenShingleSimilarity_treats_reordered_tokens_as_different()
+    {
+        var oldLines = new[]
+        {
+            "alpha beta gamma delta",
+        };
+        var newLines = new[]
+        {
+            "delta gamma beta alpha",
+        };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var result = BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines);
+
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void TokenShingleSimilarity_uses_whole_sequence_fallback_for_short_blocks()
+    {
+        var identicalOldLines = new[]
+        {
+            "foo bar",
+        };
+        var identicalNewLines = new[]
+        {
+            "foo bar",
+        };
+        var disjointOldLines = new[]
+        {
+            "foo bar",
+        };
+        var disjointNewLines = new[]
+        {
+            "baz qux",
+        };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var identicalResult = BlockSimilarityScorer.TokenShingleSimilarity(candidate, identicalOldLines, identicalNewLines);
+        var disjointResult = BlockSimilarityScorer.TokenShingleSimilarity(candidate, disjointOldLines, disjointNewLines);
+
+        Assert.Equal(1.0, identicalResult);
+        Assert.Equal(0.0, disjointResult);
+    }
 }
