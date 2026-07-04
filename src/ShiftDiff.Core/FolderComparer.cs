@@ -1,6 +1,6 @@
 namespace ShiftDiff.Core;
 
-public enum FolderChangeType { Added, Removed, Changed, Unchanged, Moved, Copied }
+public enum FolderChangeType { Added, Removed, Changed, Unchanged, Moved, Copied, MovedEdited }
 
 public sealed record FolderEntryChange(
     string RelativePath,
