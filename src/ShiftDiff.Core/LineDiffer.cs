@@ -40,31 +40,31 @@ public static class LineDiffer
         {
             if (oldLines[i] == newLines[j])
             {
-                result.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[j]));
+                result.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[j], OldIndex: i, NewIndex: j));
                 i++;
                 j++;
             }
             else if (dp[i + 1, j] >= dp[i, j + 1])
             {
-                result.Add(new LineChange(ChangeType.Removed, oldLines[i], null));
+                result.Add(new LineChange(ChangeType.Removed, oldLines[i], null, OldIndex: i));
                 i++;
             }
             else
             {
-                result.Add(new LineChange(ChangeType.Added, null, newLines[j]));
+                result.Add(new LineChange(ChangeType.Added, null, newLines[j], NewIndex: j));
                 j++;
             }
         }
 
         while (i < oldLines.Length)
         {
-            result.Add(new LineChange(ChangeType.Removed, oldLines[i], null));
+            result.Add(new LineChange(ChangeType.Removed, oldLines[i], null, OldIndex: i));
             i++;
         }
 
         while (j < newLines.Length)
         {
-            result.Add(new LineChange(ChangeType.Added, null, newLines[j]));
+            result.Add(new LineChange(ChangeType.Added, null, newLines[j], NewIndex: j));
             j++;
         }
 
@@ -110,7 +110,9 @@ public static class LineDiffer
                 result.Add(new LineChange(
                     ChangeType.Edited,
                     changes[removedStart + pair].OldLine,
-                    changes[addedStart + pair].NewLine));
+                    changes[addedStart + pair].NewLine,
+                    OldIndex: changes[removedStart + pair].OldIndex,
+                    NewIndex: changes[addedStart + pair].NewIndex));
             }
 
             for (var leftover = pairCount; leftover < removedCount; leftover++)

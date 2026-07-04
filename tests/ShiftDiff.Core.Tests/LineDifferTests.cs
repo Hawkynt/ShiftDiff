@@ -127,4 +127,54 @@ public class LineDifferTests
         Assert.Equal("b", result[1].OldLine);
         Assert.Equal("B", result[1].NewLine);
     }
+
+    [Fact]
+    public void Diff_exposes_old_and_new_indices_for_unchanged_lines()
+    {
+        var oldLines = new[] { "a", "b" };
+        var newLines = new[] { "a", "b" };
+
+        var result = LineDiffer.Diff(oldLines, newLines);
+
+        Assert.Equal(0, result[0].OldIndex);
+        Assert.Equal(0, result[0].NewIndex);
+        Assert.Equal(1, result[1].OldIndex);
+        Assert.Equal(1, result[1].NewIndex);
+    }
+
+    [Fact]
+    public void Diff_exposes_old_index_and_null_new_index_for_removed_lines()
+    {
+        var oldLines = new[] { "a", "b" };
+        var newLines = new[] { "a" };
+
+        var result = LineDiffer.Diff(oldLines, newLines);
+
+        Assert.Equal(1, result[1].OldIndex);
+        Assert.Null(result[1].NewIndex);
+    }
+
+    [Fact]
+    public void Diff_exposes_new_index_and_null_old_index_for_added_lines()
+    {
+        var oldLines = new[] { "a" };
+        var newLines = new[] { "a", "b" };
+
+        var result = LineDiffer.Diff(oldLines, newLines);
+
+        Assert.Equal(1, result[1].NewIndex);
+        Assert.Null(result[1].OldIndex);
+    }
+
+    [Fact]
+    public void Diff_exposes_both_indices_for_edited_pairs()
+    {
+        var oldLines = new[] { "a", "b" };
+        var newLines = new[] { "a", "B" };
+
+        var result = LineDiffer.Diff(oldLines, newLines);
+
+        Assert.Equal(1, result[1].OldIndex);
+        Assert.Equal(1, result[1].NewIndex);
+    }
 }
