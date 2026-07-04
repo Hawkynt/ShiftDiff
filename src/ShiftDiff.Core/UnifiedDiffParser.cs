@@ -336,8 +336,25 @@ public static class UnifiedDiffParser
             gitHeader = new GitExtendedHeader(diffHeader, modeChange, creationMode, similarityIndex, renameCopyMetadata, indexHash);
         }
 
-        var header = ParseFileHeader(lines[index], lines[index + 1]);
-        index += 2;
+        UnifiedDiffFileHeader header;
+        if (index < lines.Count && lines[index].StartsWith("--- ", StringComparison.Ordinal))
+        {
+            header = ParseFileHeader(lines[index], lines[index + 1]);
+            index += 2;
+        }
+        else if (gitHeader is not null)
+        {
+            // A pure git rename/copy/mode-change block carries no "--- "/"+++ " pair
+            // and no content hunks — the paths come from the git metadata instead.
+            var renameCopyMetadata = gitHeader.RenameCopyMetadata;
+            header = new UnifiedDiffFileHeader(
+                renameCopyMetadata?.SourcePath ?? gitHeader.Header.OldPath,
+                renameCopyMetadata?.TargetPath ?? gitHeader.Header.NewPath);
+        }
+        else
+        {
+            throw new FormatException("Expected a file header line.");
+        }
 
         var hunks = new List<UnifiedDiffHunk>();
         while (index < lines.Count)
@@ -385,12 +402,16 @@ public static class UnifiedDiffParser
             {
                 // Skip past this block's own "--- "/"+++ " pair before scanning for the
                 // next block's boundary, or it would be mistaken for a new file's start.
-                while (index < lines.Count && !lines[index].StartsWith("--- ", StringComparison.Ordinal))
+                // A pure rename/mode-change block has no such pair at all — stop at the
+                // next "diff --git " line instead of scanning into a later block's pair.
+                while (index < lines.Count &&
+                       !lines[index].StartsWith("--- ", StringComparison.Ordinal) &&
+                       !lines[index].StartsWith("diff --git ", StringComparison.Ordinal))
                 {
                     index++;
                 }
 
-                if (index < lines.Count)
+                if (index < lines.Count && lines[index].StartsWith("--- ", StringComparison.Ordinal))
                 {
                     index += 2;
                 }

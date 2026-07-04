@@ -542,4 +542,64 @@ public class UnifiedDiffParserTests
         Assert.Equal("old1.txt", patch.Files[0].GitHeader!.Header.OldPath);
         Assert.Equal("old2.txt", patch.Files[1].GitHeader!.Header.OldPath);
     }
+
+    [Fact]
+    public void ParseFile_PureRenameWithNoContentHunks_HasEmptyHunksAndPathsFromRenameMetadata()
+    {
+        var lines = new[]
+        {
+            "diff --git a/old.txt b/foo.txt",
+            "similarity index 100%",
+            "rename from old.txt", "rename to foo.txt",
+        };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.Empty(file.Hunks);
+        Assert.Equal("old.txt", file.Header.SourcePath);
+        Assert.Equal("foo.txt", file.Header.TargetPath);
+        Assert.Null(file.Header.SourceRevision);
+        Assert.Null(file.Header.TargetRevision);
+        Assert.Equal(GitRenameCopyKind.Rename, file.GitHeader!.RenameCopyMetadata!.Kind);
+    }
+
+    [Fact]
+    public void ParseFile_PureModeChangeWithNoContentHunks_HasEmptyHunksAndPathsFromDiffHeader()
+    {
+        var lines = new[]
+        {
+            "diff --git a/foo.txt b/foo.txt",
+            "old mode 100644", "new mode 100755",
+        };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.Empty(file.Hunks);
+        Assert.Equal("foo.txt", file.Header.SourcePath);
+        Assert.Equal("foo.txt", file.Header.TargetPath);
+    }
+
+    [Fact]
+    public void ParseFile_GitPreambleWithNoContentHunksAndNoRename_ThrowsWhenLinesRunOut()
+    {
+        var lines = new[] { "diff --git a/foo.txt b/foo.txt" };
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFile(lines));
+    }
+
+    [Fact]
+    public void ParsePatch_WithPureRenameBlockFollowedByNormalBlock_ParsesBothFilesSeparately()
+    {
+        var lines = new[]
+        {
+            "diff --git a/old.txt b/foo.txt",
+            "similarity index 100%",
+            "rename from old.txt", "rename to foo.txt",
+            "diff --git a/bar.txt b/bar.txt",
+            "--- a/bar.txt", "+++ b/bar.txt",
+            "@@ -1,1 +1,1 @@", " a",
+        };
+        var patch = UnifiedDiffParser.ParsePatch(lines);
+        Assert.Equal(2, patch.Files.Count);
+        Assert.Empty(patch.Files[0].Hunks);
+        Assert.Equal("old.txt", patch.Files[0].Header.SourcePath);
+        Assert.Equal("foo.txt", patch.Files[0].Header.TargetPath);
+        Assert.Single(patch.Files[1].Hunks);
+        Assert.Equal("a/bar.txt", patch.Files[1].Header.SourcePath);
+    }
 }
