@@ -60,4 +60,22 @@ public class TokenDifferTests
 
         Assert.All(changes, c => Assert.Equal(ChangeType.Unchanged, c.ChangeType));
     }
+
+    [Fact]
+    public void Diff_DefaultsToGenericTokenization_QuotedStringSplitsAtWordBoundaries()
+    {
+        var changes = TokenDiffer.Diff("x = \"foo\";", "x = \"foo\";");
+
+        Assert.Contains(changes, c => c.OldToken == "foo");
+    }
+
+    [Fact]
+    public void Diff_WithIsSourceCode_TreatsQuotedStringAsOneToken()
+    {
+        var changes = TokenDiffer.Diff("x = \"foo\";", "x = \"bar\";", isSourceCode: true);
+
+        var changed = changes.Where(c => c.ChangeType != ChangeType.Unchanged).ToArray();
+        Assert.Contains(changed, c => c.OldToken == "\"foo\"");
+        Assert.Contains(changed, c => c.NewToken == "\"bar\"");
+    }
 }

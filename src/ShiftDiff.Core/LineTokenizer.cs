@@ -28,5 +28,65 @@ public static class LineTokenizer
         return tokens.ToArray();
     }
 
+    public static string[] TokenizeSourceCode(string line)
+    {
+        if (line.Length == 0)
+        {
+            return [];
+        }
+
+        var tokens = new List<string>();
+        var i = 0;
+
+        while (i < line.Length)
+        {
+            if (IsQuoteChar(line[i]))
+            {
+                var literalEnd = FindLiteralEnd(line, i);
+                tokens.Add(line[i..literalEnd]);
+                i = literalEnd;
+                continue;
+            }
+
+            var start = i;
+            var inWord = IsWordChar(line[i]);
+            i++;
+            while (i < line.Length && !IsQuoteChar(line[i]) && IsWordChar(line[i]) == inWord)
+            {
+                i++;
+            }
+
+            tokens.Add(line[start..i]);
+        }
+
+        return tokens.ToArray();
+    }
+
+    private static int FindLiteralEnd(string line, int start)
+    {
+        var quote = line[start];
+        var i = start + 1;
+
+        while (i < line.Length)
+        {
+            if (line[i] == '\\' && i + 1 < line.Length)
+            {
+                i += 2;
+                continue;
+            }
+
+            if (line[i] == quote)
+            {
+                return i + 1;
+            }
+
+            i++;
+        }
+
+        return line.Length;
+    }
+
+    private static bool IsQuoteChar(char c) => c is '"' or '\'';
+
     private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 }
