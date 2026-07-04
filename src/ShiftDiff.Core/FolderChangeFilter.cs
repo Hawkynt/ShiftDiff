@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace ShiftDiff.Core;
 
 public static class FolderChangeFilter
@@ -47,5 +49,29 @@ public static class FolderChangeFilter
                 && (minSize is null || size >= minSize)
                 && (maxSize is null || size <= maxSize))
             .ToArray();
+    }
+
+    public static FolderEntryChange[] ByIgnoreRules(
+        IReadOnlyList<FolderEntryChange> changes,
+        params string[] patterns)
+    {
+        if (patterns.Length == 0)
+        {
+            return changes.ToArray();
+        }
+
+        var regexes = patterns.Select(ToIgnoreRegex).ToArray();
+        return changes
+            .Where(c => !regexes.Any(r => r.IsMatch(c.RelativePath)))
+            .ToArray();
+    }
+
+    private static Regex ToIgnoreRegex(string pattern)
+    {
+        var escaped = Regex.Escape(pattern)
+            .Replace(@"\*\*", ".*")
+            .Replace(@"\*", "[^/]*")
+            .Replace(@"\?", ".");
+        return new Regex($"^{escaped}$", RegexOptions.Compiled);
     }
 }

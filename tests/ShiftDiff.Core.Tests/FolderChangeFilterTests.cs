@@ -165,4 +165,71 @@ public class FolderChangeFilterTests
             new[] { "a.cs", "b.txt", "nested/c.CS", "d.md" },
             result.Select(e => e.RelativePath));
     }
+
+    private static FolderEntryChange[] IgnoreSampleChanges() =>
+        new[]
+        {
+            new FolderEntryChange("a.cs", FolderChangeType.Added),
+            new FolderEntryChange("bin/output.dll", FolderChangeType.Added),
+            new FolderEntryChange("obj/nested/temp.obj", FolderChangeType.Added),
+            new FolderEntryChange("notes.log", FolderChangeType.Changed),
+            new FolderEntryChange("d.md", FolderChangeType.Unchanged),
+        };
+
+    [Fact]
+    public void ByIgnoreRules_NoPatternsGiven_ReturnsAllUnfiltered()
+    {
+        var changes = IgnoreSampleChanges();
+
+        var result = FolderChangeFilter.ByIgnoreRules(changes);
+
+        Assert.Equal(changes, result);
+    }
+
+    [Fact]
+    public void ByIgnoreRules_ExactPathMatch_Excluded()
+    {
+        var result = FolderChangeFilter.ByIgnoreRules(IgnoreSampleChanges(), "a.cs");
+
+        Assert.DoesNotContain(result, e => e.RelativePath == "a.cs");
+    }
+
+    [Fact]
+    public void ByIgnoreRules_SingleStarWildcard_ExcludesMatchingFilesInThatDirOnly()
+    {
+        var result = FolderChangeFilter.ByIgnoreRules(IgnoreSampleChanges(), "*.log");
+
+        Assert.DoesNotContain(result, e => e.RelativePath == "notes.log");
+        Assert.Contains(result, e => e.RelativePath == "obj/nested/temp.obj");
+    }
+
+    [Fact]
+    public void ByIgnoreRules_DoubleStarWildcard_MatchesAcrossDirectories()
+    {
+        var result = FolderChangeFilter.ByIgnoreRules(IgnoreSampleChanges(), "bin/**", "obj/**");
+
+        Assert.Equal(
+            new[] { "a.cs", "notes.log", "d.md" },
+            result.Select(e => e.RelativePath));
+    }
+
+    [Fact]
+    public void ByIgnoreRules_NonMatchingPattern_KeepsAllEntries()
+    {
+        var changes = IgnoreSampleChanges();
+
+        var result = FolderChangeFilter.ByIgnoreRules(changes, "*.tmp");
+
+        Assert.Equal(changes, result);
+    }
+
+    [Fact]
+    public void ByIgnoreRules_PreservesInputOrder()
+    {
+        var result = FolderChangeFilter.ByIgnoreRules(IgnoreSampleChanges(), "bin/**");
+
+        Assert.Equal(
+            new[] { "a.cs", "obj/nested/temp.obj", "notes.log", "d.md" },
+            result.Select(e => e.RelativePath));
+    }
 }
