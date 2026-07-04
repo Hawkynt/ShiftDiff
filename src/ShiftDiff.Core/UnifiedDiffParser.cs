@@ -10,6 +10,8 @@ public enum UnifiedDiffLineKind { Context, Added, Removed }
 
 public sealed record UnifiedDiffLine(UnifiedDiffLineKind Kind, string Content);
 
+public sealed record UnifiedDiffHunk(UnifiedDiffHunkHeader Header, IReadOnlyList<UnifiedDiffLine> Lines);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -81,5 +83,12 @@ public static class UnifiedDiffParser
         };
 
         return new UnifiedDiffLine(kind, line[1..]);
+    }
+
+    public static UnifiedDiffHunk ParseHunk(string headerLine, IReadOnlyList<string> bodyLines)
+    {
+        var header = ParseHunkHeader(headerLine);
+        var lines = bodyLines.Select(ParseLine).ToList();
+        return new UnifiedDiffHunk(header, lines);
     }
 }

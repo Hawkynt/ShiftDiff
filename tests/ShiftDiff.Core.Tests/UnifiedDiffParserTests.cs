@@ -132,4 +132,49 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseLine(""));
     }
+
+    [Fact]
+    public void AllContextHunk_ParsesHeaderAndAllContextLines()
+    {
+        var hunk = UnifiedDiffParser.ParseHunk("@@ -1,3 +1,3 @@", new[] { " a", " b", " c" });
+        Assert.Equal(1, hunk.Header.OldStart);
+        Assert.Equal(3, hunk.Header.OldCount);
+        Assert.Equal(3, hunk.Lines.Count);
+        Assert.All(hunk.Lines, line => Assert.Equal(UnifiedDiffLineKind.Context, line.Kind));
+    }
+
+    [Fact]
+    public void MixedHunk_ParsesLinesInOrderWithCorrectKinds()
+    {
+        var hunk = UnifiedDiffParser.ParseHunk("@@ -1,2 +1,3 @@", new[] { " same", "-old", "+new1", "+new2" });
+        Assert.Equal(4, hunk.Lines.Count);
+        Assert.Equal(
+            new[]
+            {
+                UnifiedDiffLineKind.Context,
+                UnifiedDiffLineKind.Removed,
+                UnifiedDiffLineKind.Added,
+                UnifiedDiffLineKind.Added,
+            },
+            hunk.Lines.Select(line => line.Kind));
+    }
+
+    [Fact]
+    public void EmptyBody_ParsesEmptyLinesCollection()
+    {
+        var hunk = UnifiedDiffParser.ParseHunk("@@ -1,0 +1,0 @@", Array.Empty<string>());
+        Assert.Empty(hunk.Lines);
+    }
+
+    [Fact]
+    public void MalformedHeader_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseHunk("not a hunk header", Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void MalformedBodyLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseHunk("@@ -1,1 +1,1 @@", new[] { "@oops" }));
+    }
 }
