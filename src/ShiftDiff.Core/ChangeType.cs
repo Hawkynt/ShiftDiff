@@ -6,5 +6,6 @@ public enum ChangeType
     Edited,
     Added,
     Removed,
-    Moved
+    Moved,
+    Uncertain
 }

@@ -110,4 +110,31 @@ public class BlockClassifierTests
         var match = Assert.Single(result);
         Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875), match);
     }
+
+    [Fact]
+    public void Classify_marks_a_low_similarity_candidate_as_uncertain()
+    {
+        var oldLines = new[]
+        {
+            "context before line zero old side aaa",
+            "totally unrelated old content xyz123",
+            "different structure entirely qqq999",
+            "context after line old side bbb",
+        };
+        var newLines = new[]
+        {
+            "context before line zero new side ccc",
+            "completely different new stuff foo456",
+            "nothing in common here at all zzz000",
+            "another line making it three long here",
+            "context after line new side ddd",
+        };
+        var candidates = new[] { new BlockCandidate(1, 2, 1, 3) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Uncertain, match.MatchType);
+        Assert.Equal(0.4036458333333333, match.Score, 15);
+    }
 }
