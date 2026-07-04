@@ -1,7 +1,12 @@
+using System.Linq;
+
 namespace ShiftDiff.Core;
 
 public static class AnchorDetector
 {
+    public static int DuplicateCount(string[] lines, int index) =>
+        lines.Count(line => LineHasher.Hash(line).WhitespaceNormalized == LineHasher.Hash(lines[index]).WhitespaceNormalized);
+
     public static LineAnchor[] Detect(string[] lines)
     {
         var whitespaceNormalizedCounts = lines

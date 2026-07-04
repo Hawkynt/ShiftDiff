@@ -55,4 +55,27 @@ public class AnchorDetectorTests
         Assert.Equal(1, result[1].Index);
         Assert.Equal(2, result[2].Index);
     }
+
+    [Fact]
+    public void DuplicateCount_returns_one_for_a_unique_line()
+    {
+        var lines = new[] { "public static LineHash Hash(string line)", "x = 1;" };
+
+        Assert.Equal(1, AnchorDetector.DuplicateCount(lines, 0));
+    }
+
+    [Fact]
+    public void DuplicateCount_counts_whitespace_normalized_duplicates_across_the_whole_array()
+    {
+        var lines = new[]
+        {
+            "public static LineHash Hash(string line)",
+            "x = 1;",
+            "public   static   LineHash   Hash(string   line)",
+        };
+
+        Assert.Equal(2, AnchorDetector.DuplicateCount(lines, 0));
+        Assert.Equal(2, AnchorDetector.DuplicateCount(lines, 2));
+        Assert.Equal(1, AnchorDetector.DuplicateCount(lines, 1));
+    }
 }
