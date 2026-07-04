@@ -4,17 +4,20 @@ public static class UnifiedDiffFormatter
 {
     public static IReadOnlyList<string> Format(UnifiedDiffFile file)
     {
+        var lines = new List<string>();
+
         if (file.GitHeader is not null)
         {
-            throw new NotSupportedException(
-                "Formatting a UnifiedDiffFile with a git extended header is not supported in this slice.");
+            lines.AddRange(FormatGitHeader(file.GitHeader));
         }
 
-        var lines = new List<string>
+        // A pure git rename/copy/mode-change block carries no "--- "/"+++ " pair —
+        // mirrors UnifiedDiffParser.ParseFile's own fallback for that shape.
+        if (file.GitHeader is null || file.Hunks.Count > 0)
         {
-            FormatFileHeaderLine("---", file.Header.SourcePath, file.Header.SourceRevision),
-            FormatFileHeaderLine("+++", file.Header.TargetPath, file.Header.TargetRevision),
-        };
+            lines.Add(FormatFileHeaderLine("---", file.Header.SourcePath, file.Header.SourceRevision));
+            lines.Add(FormatFileHeaderLine("+++", file.Header.TargetPath, file.Header.TargetRevision));
+        }
 
         foreach (var hunk in file.Hunks)
         {
@@ -26,6 +29,52 @@ public static class UnifiedDiffFormatter
         }
 
         return lines;
+    }
+
+    private static IEnumerable<string> FormatGitHeader(GitExtendedHeader header)
+    {
+        yield return $"diff --git a/{header.Header.OldPath} b/{header.Header.NewPath}";
+
+        if (header.ModeChange is not null)
+        {
+            yield return $"old mode {header.ModeChange.OldMode}";
+            yield return $"new mode {header.ModeChange.NewMode}";
+        }
+        else if (header.CreationMode is not null)
+        {
+            yield return header.CreationMode.Kind == GitFileCreationKind.NewFile
+                ? $"new file mode {header.CreationMode.Mode}"
+                : $"deleted file mode {header.CreationMode.Mode}";
+        }
+
+        if (header.SimilarityIndex is not null)
+        {
+            yield return header.SimilarityIndex.Kind == GitSimilarityKind.Similarity
+                ? $"similarity index {header.SimilarityIndex.Percentage}%"
+                : $"dissimilarity index {header.SimilarityIndex.Percentage}%";
+        }
+
+        if (header.RenameCopyMetadata is not null)
+        {
+            var metadata = header.RenameCopyMetadata;
+            if (metadata.Kind == GitRenameCopyKind.Rename)
+            {
+                yield return $"rename from {metadata.SourcePath}";
+                yield return $"rename to {metadata.TargetPath}";
+            }
+            else
+            {
+                yield return $"copy from {metadata.SourcePath}";
+                yield return $"copy to {metadata.TargetPath}";
+            }
+        }
+
+        if (header.IndexHash is not null)
+        {
+            yield return header.IndexHash.Mode is null
+                ? $"index {header.IndexHash.OldHash}..{header.IndexHash.NewHash}"
+                : $"index {header.IndexHash.OldHash}..{header.IndexHash.NewHash} {header.IndexHash.Mode}";
+        }
     }
 
     public static IReadOnlyList<string> Format(UnifiedDiffPatch patch)

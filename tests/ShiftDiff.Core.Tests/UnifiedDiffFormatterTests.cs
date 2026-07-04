@@ -134,6 +134,7 @@ public class UnifiedDiffFormatterTests
     private static void AssertFilesEqual(UnifiedDiffFile expected, UnifiedDiffFile actual)
     {
         Assert.Equal(expected.Header, actual.Header);
+        Assert.Equal(expected.GitHeader, actual.GitHeader);
         Assert.Equal(expected.Hunks.Count, actual.Hunks.Count);
         for (var i = 0; i < expected.Hunks.Count; i++)
         {
@@ -143,17 +144,201 @@ public class UnifiedDiffFormatterTests
     }
 
     [Fact]
-    public void FileWithGitHeader_ThrowsNotSupportedException()
+    public void GitFileWithContentHunks_RoundTripsFullyWithDashPairAndHunks()
     {
         var lines = new[]
         {
             "diff --git a/foo.txt b/foo.txt",
+            "index abc123..def456 100644",
             "--- a/foo.txt", "+++ b/foo.txt",
             "@@ -1,1 +1,1 @@", " a",
         };
         var file = UnifiedDiffParser.ParseFile(lines);
 
-        Assert.NotNull(file.GitHeader);
-        Assert.Throws<NotSupportedException>(() => UnifiedDiffFormatter.Format(file));
+        var formatted = UnifiedDiffFormatter.Format(file);
+        Assert.Equal(lines, formatted);
+
+        var reparsed = UnifiedDiffParser.ParsePatch(formatted.ToList());
+        Assert.Single(reparsed.Files);
+        AssertFilesEqual(file, reparsed.Files[0]);
+    }
+
+    [Fact]
+    public void GitModeChange_FormatsOldModeThenNewModeWithNoDashPair()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("foo.txt", "foo.txt"),
+            Array.Empty<UnifiedDiffHunk>(),
+            new GitExtendedHeader(
+                new GitDiffHeader("foo.txt", "foo.txt"),
+                new GitFileModeChange("100644", "100755"),
+                null, null, null, null));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(
+            new[] { "diff --git a/foo.txt b/foo.txt", "old mode 100644", "new mode 100755" },
+            lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitNewFileMode_FormatsNewFileModeLine()
+    {
+        var file = GitOnlyFile(creationMode: new GitFileCreationMode(GitFileCreationKind.NewFile, "100644"));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(new[] { "diff --git a/new.txt b/new.txt", "new file mode 100644" }, lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitDeletedFileMode_FormatsDeletedFileModeLine()
+    {
+        var file = GitOnlyFile(creationMode: new GitFileCreationMode(GitFileCreationKind.DeletedFile, "100644"));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(new[] { "diff --git a/new.txt b/new.txt", "deleted file mode 100644" }, lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitSimilarityIndex_FormatsSimilarityIndexLine()
+    {
+        var file = GitOnlyFile(similarityIndex: new GitSimilarityIndex(GitSimilarityKind.Similarity, 90));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(new[] { "diff --git a/new.txt b/new.txt", "similarity index 90%" }, lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitDissimilarityIndex_FormatsDissimilarityIndexLine()
+    {
+        var file = GitOnlyFile(similarityIndex: new GitSimilarityIndex(GitSimilarityKind.Dissimilarity, 10));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(new[] { "diff --git a/new.txt b/new.txt", "dissimilarity index 10%" }, lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitRenameMetadata_FormatsRenameFromAndRenameToLinesWithNoDashPair()
+    {
+        // The parser derives Header from rename metadata (not GitHeader.Header) when there
+        // are no hunks, so Header must match SourcePath/TargetPath for a clean round-trip.
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("old/path.txt", "new/path.txt"),
+            Array.Empty<UnifiedDiffHunk>(),
+            new GitExtendedHeader(
+                new GitDiffHeader("new.txt", "new.txt"),
+                null, null, null,
+                new GitRenameCopyMetadata(GitRenameCopyKind.Rename, "old/path.txt", "new/path.txt"),
+                null));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(
+            new[] { "diff --git a/new.txt b/new.txt", "rename from old/path.txt", "rename to new/path.txt" },
+            lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitCopyMetadata_FormatsCopyFromAndCopyToLines()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("old/path.txt", "new/path.txt"),
+            Array.Empty<UnifiedDiffHunk>(),
+            new GitExtendedHeader(
+                new GitDiffHeader("new.txt", "new.txt"),
+                null, null, null,
+                new GitRenameCopyMetadata(GitRenameCopyKind.Copy, "old/path.txt", "new/path.txt"),
+                null));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(
+            new[] { "diff --git a/new.txt b/new.txt", "copy from old/path.txt", "copy to new/path.txt" },
+            lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitIndexHashWithoutMode_FormatsIndexLine()
+    {
+        var file = GitOnlyFile(indexHash: new GitIndexHash("abc123", "def456", null));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(new[] { "diff --git a/new.txt b/new.txt", "index abc123..def456" }, lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitIndexHashWithMode_FormatsIndexLineWithTrailingMode()
+    {
+        var file = GitOnlyFile(indexHash: new GitIndexHash("abc123", "def456", "100644"));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(new[] { "diff --git a/new.txt b/new.txt", "index abc123..def456 100644" }, lines);
+        RoundTripsThroughParser(file);
+    }
+
+    [Fact]
+    public void GitHeaderWithAllOptionalComponents_EmitsThemInParseOrder()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("old/path.txt", "new/path.txt"),
+            Array.Empty<UnifiedDiffHunk>(),
+            new GitExtendedHeader(
+                new GitDiffHeader("old/path.txt", "new/path.txt"),
+                new GitFileModeChange("100644", "100755"),
+                new GitFileCreationMode(GitFileCreationKind.NewFile, "100644"),
+                new GitSimilarityIndex(GitSimilarityKind.Similarity, 90),
+                new GitRenameCopyMetadata(GitRenameCopyKind.Rename, "old/path.txt", "new/path.txt"),
+                new GitIndexHash("abc123", "def456", "100644")));
+
+        var lines = UnifiedDiffFormatter.Format(file);
+
+        Assert.Equal(
+            new[]
+            {
+                "diff --git a/old/path.txt b/new/path.txt",
+                "old mode 100644", "new mode 100755",
+                "similarity index 90%",
+                "rename from old/path.txt", "rename to new/path.txt",
+                "index abc123..def456 100644",
+            },
+            lines);
+    }
+
+    private static UnifiedDiffFile GitOnlyFile(
+        GitFileModeChange? modeChange = null,
+        GitFileCreationMode? creationMode = null,
+        GitSimilarityIndex? similarityIndex = null,
+        GitRenameCopyMetadata? renameCopyMetadata = null,
+        GitIndexHash? indexHash = null)
+    {
+        return new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("new.txt", "new.txt"),
+            Array.Empty<UnifiedDiffHunk>(),
+            new GitExtendedHeader(
+                new GitDiffHeader("new.txt", "new.txt"),
+                modeChange, creationMode, similarityIndex, renameCopyMetadata, indexHash));
+    }
+
+    private static void RoundTripsThroughParser(UnifiedDiffFile file)
+    {
+        var lines = UnifiedDiffFormatter.Format(file);
+        var reparsed = UnifiedDiffParser.ParsePatch(lines.ToList());
+
+        Assert.Single(reparsed.Files);
+        AssertFilesEqual(file, reparsed.Files[0]);
     }
 }
