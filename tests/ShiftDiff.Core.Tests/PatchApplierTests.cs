@@ -200,6 +200,114 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void FindFuzzyCandidates_BlockDuplicatedAtTwoLocations_ReturnsTwoExactCandidates()
+    {
+        // Counterpart to FindSemanticCandidates_BlockDuplicatedAtTwoLocations,
+        // proving fuzzy mode *can* surface the ambiguous-duplicate case that
+        // semantic mode structurally cannot (no anchor-uniqueness gate here).
+        var source = new[] { "a", "b", "c", "x", "a", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var candidates = PatchApplier.FindFuzzyCandidates(source, hunk);
+
+        Assert.Equal(2, candidates.Count);
+        Assert.Equal(1, candidates[0].LineNumber);
+        Assert.Equal(PatchApplicationConfidence.Exact, candidates[0].Confidence);
+        Assert.Equal(5, candidates[1].LineNumber);
+        Assert.Equal(PatchApplicationConfidence.Exact, candidates[1].Confidence);
+    }
+
+    [Fact]
+    public void FindFuzzyCandidates_UnambiguousMatch_ReturnsSingleCandidate()
+    {
+        var source = new[] { "a", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var candidates = PatchApplier.FindFuzzyCandidates(source, hunk);
+
+        Assert.Single(candidates);
+        Assert.Equal(1, candidates[0].LineNumber);
+        Assert.Equal(PatchApplicationConfidence.Exact, candidates[0].Confidence);
+    }
+
+    [Fact]
+    public void FindFuzzyCandidates_ContextNotFoundAnywhereInSource_ReturnsEmpty()
+    {
+        var source = new[] { "x", "y", "z" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var candidates = PatchApplier.FindFuzzyCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
+
+    [Fact]
+    public void FindFuzzyCandidates_PureInsertionHunk_ReturnsEmpty()
+    {
+        var source = new[] { "a", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(2, 0, 2, 1),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Added, "NEW"),
+            });
+
+        var candidates = PatchApplier.FindFuzzyCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
+
+    [Fact]
+    public void FindFuzzyCandidates_ExactAndDriftMatchAtDifferentPositions_OrdersExactFirstRegardlessOfDistance()
+    {
+        // Recorded position is index 0 (closest to the drift match), yet the
+        // exact match at index 4 must still sort first — Exact always outranks
+        // High confidence, distance only breaks ties within the same kind.
+        var source = new[] { "a2", "b", "c", "x", "a", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var candidates = PatchApplier.FindFuzzyCandidates(source, hunk);
+
+        Assert.Equal(2, candidates.Count);
+        Assert.Equal(PatchApplicationConfidence.Exact, candidates[0].Confidence);
+        Assert.Equal(5, candidates[0].LineNumber);
+        Assert.Equal(PatchApplicationConfidence.High, candidates[1].Confidence);
+        Assert.Equal(1, candidates[1].LineNumber);
+    }
+
+    [Fact]
     public void ApplyPatchExact_MultipleFiles_EachRoutedToItsOwnSourceByPath()
     {
         var fileA = new UnifiedDiffFile(

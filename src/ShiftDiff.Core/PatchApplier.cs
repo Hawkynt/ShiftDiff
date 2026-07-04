@@ -18,6 +18,8 @@ public sealed record PatchApplicationResult(IReadOnlyList<string> Lines, PatchAp
 
 public sealed record PatchApplicationCandidate(int LineNumber, double Score, Confidence Confidence);
 
+public sealed record PatchFuzzyCandidate(int LineNumber, PatchApplicationConfidence Confidence);
+
 public static class PatchApplier
 {
     public static IReadOnlyList<string> ApplyHunkExact(IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk)
@@ -147,6 +149,33 @@ public static class PatchApplier
         }
 
         return new PatchApplicationResult(lines, confidence);
+    }
+
+    // FR-023 second slice: fuzzy mode's counterpart to FindSemanticCandidates.
+    // Unlike block-identity matching, MatchAt has no anchor-uniqueness gate at
+    // all, so a verbatim-duplicated block genuinely surfaces as 2+ candidates
+    // here — the ambiguous-duplicate scenario FR-023 describes, which semantic
+    // mode structurally cannot detect. Deliberately additive: ApplyHunkFuzzy/
+    // ApplyFileFuzzy keep using FindClosestMatch and are untouched.
+    public static IReadOnlyList<PatchFuzzyCandidate> FindFuzzyCandidates(
+        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk)
+    {
+        var oldLines = hunk.Lines
+            .Where(line => line.Kind is UnifiedDiffLineKind.Context or UnifiedDiffLineKind.Removed)
+            .ToList();
+        if (oldLines.Count == 0)
+        {
+            return Array.Empty<PatchFuzzyCandidate>();
+        }
+
+        var preferredIndex = hunk.Header.OldStart - 1;
+        return FindAllMatches(sourceLines, oldLines)
+            .OrderBy(match => match.Kind == MatchKind.Exact ? 0 : 1)
+            .ThenBy(match => Math.Abs(match.Index - preferredIndex))
+            .Select(match => new PatchFuzzyCandidate(
+                match.Index + 1,
+                match.Kind == MatchKind.Exact ? PatchApplicationConfidence.Exact : PatchApplicationConfidence.High))
+            .ToList();
     }
 
     public static PatchApplicationResult ApplyHunkSemantic(
@@ -331,34 +360,44 @@ public static class PatchApplier
     private static FuzzyMatch? FindClosestMatch(
         IReadOnlyList<string> sourceLines, IReadOnlyList<UnifiedDiffLine> oldLines, int preferredIndex)
     {
+        FuzzyMatch? best = null;
+        var bestDistance = int.MaxValue;
+        foreach (var match in FindAllMatches(sourceLines, oldLines))
+        {
+            var distance = Math.Abs(match.Index - preferredIndex);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = match;
+            }
+        }
+
+        return best;
+    }
+
+    private static List<FuzzyMatch> FindAllMatches(
+        IReadOnlyList<string> sourceLines, IReadOnlyList<UnifiedDiffLine> oldLines)
+    {
+        var results = new List<FuzzyMatch>();
         var lastPossibleStart = sourceLines.Count - oldLines.Count;
         if (lastPossibleStart < 0)
         {
-            return null;
+            return results;
         }
 
         var leadingContextRun = CountLeadingContextRun(oldLines);
         var trailingContextRun = CountTrailingContextRun(oldLines);
 
-        FuzzyMatch? best = null;
-        var bestDistance = int.MaxValue;
         for (var candidate = 0; candidate <= lastPossibleStart; candidate++)
         {
             var kind = MatchAt(sourceLines, oldLines, candidate, leadingContextRun, trailingContextRun);
-            if (kind is null)
+            if (kind is not null)
             {
-                continue;
-            }
-
-            var distance = Math.Abs(candidate - preferredIndex);
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = new FuzzyMatch(candidate, kind.Value);
+                results.Add(new FuzzyMatch(candidate, kind.Value));
             }
         }
 
-        return best;
+        return results;
     }
 
     // Counts Context-kind lines before the first Removed-kind line — the
