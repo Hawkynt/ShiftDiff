@@ -1,9 +1,11 @@
+using System.Numerics;
 using System.Text;
 
 namespace ShiftDiff.Core;
 
 public static class BlockSimilarityScorer
 {
+    private const int FingerprintBits = 64;
     private const int ShingleSize = 3;
 
     public static double ExactHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines)
@@ -58,6 +60,28 @@ public static class BlockSimilarityScorer
         var unionCount = oldShingles.Union(newShingles).Count();
 
         return intersectionCount / (double)unionCount;
+    }
+
+    public static double SimHashSimilarity(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    {
+        var oldTokens = TokenizeRange(oldLines, candidate.OldStart, candidate.OldEnd);
+        var newTokens = TokenizeRange(newLines, candidate.NewStart, candidate.NewEnd);
+
+        if (oldTokens.Count == 0 && newTokens.Count == 0)
+        {
+            return 1.0;
+        }
+
+        if (oldTokens.Count == 0 || newTokens.Count == 0)
+        {
+            return 0.0;
+        }
+
+        var oldFingerprint = BuildFingerprint(oldTokens);
+        var newFingerprint = BuildFingerprint(newTokens);
+        var distance = HammingDistance(oldFingerprint, newFingerprint);
+
+        return 1.0 - (distance / (double)FingerprintBits);
     }
 
     private static List<string> Tokenize(string line)
@@ -122,4 +146,45 @@ public static class BlockSimilarityScorer
 
         return shingles;
     }
+
+    private static ulong HashToken(string token)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(token));
+
+        return BitConverter.ToUInt64(hash, 0);
+    }
+
+    private static ulong BuildFingerprint(List<string> tokens)
+    {
+        var frequencies = tokens
+            .GroupBy(token => token)
+            .Select(group => new
+            {
+                Token = group.Key,
+                Weight = group.Count(),
+            });
+
+        ulong fingerprint = 0;
+
+        for (var bit = 0; bit < FingerprintBits; bit++)
+        {
+            var sum = 0;
+
+            foreach (var frequency in frequencies)
+            {
+                var tokenHash = HashToken(frequency.Token);
+                var bitSet = ((tokenHash >> bit) & 1) == 1;
+                sum += bitSet ? frequency.Weight : -frequency.Weight;
+            }
+
+            if (sum > 0)
+            {
+                fingerprint |= 1UL << bit;
+            }
+        }
+
+        return fingerprint;
+    }
+
+    private static int HammingDistance(ulong a, ulong b) => BitOperations.PopCount(a ^ b);
 }
