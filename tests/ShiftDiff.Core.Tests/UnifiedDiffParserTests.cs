@@ -295,4 +295,24 @@ public class UnifiedDiffParserTests
         };
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParsePatch(lines));
     }
+
+    [Fact]
+    public void NormalPair_ParsesOldAndNewModes()
+    {
+        var change = UnifiedDiffParser.ParseFileModeChange("old mode 100644", "new mode 100755");
+        Assert.Equal("100644", change.OldMode);
+        Assert.Equal("100755", change.NewMode);
+    }
+
+    [Fact]
+    public void MalformedOldModeLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileModeChange("100644", "new mode 100755"));
+    }
+
+    [Fact]
+    public void MalformedNewModeLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileModeChange("old mode 100644", "100755"));
+    }
 }

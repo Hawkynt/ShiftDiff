@@ -20,6 +20,8 @@ public sealed record UnifiedDiffFile(UnifiedDiffFileHeader Header, IReadOnlyList
 
 public sealed record UnifiedDiffPatch(IReadOnlyList<UnifiedDiffFile> Files);
 
+public sealed record GitFileModeChange(string OldMode, string NewMode);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -51,6 +53,21 @@ public static class UnifiedDiffParser
         return tabIndex >= 0
             ? (rest[..tabIndex], rest[(tabIndex + 1)..])
             : (rest, null);
+    }
+
+    public static GitFileModeChange ParseFileModeChange(string oldModeLine, string newModeLine)
+    {
+        if (!oldModeLine.StartsWith("old mode ", StringComparison.Ordinal))
+        {
+            throw new FormatException("The old line is not a git file mode change header.");
+        }
+
+        if (!newModeLine.StartsWith("new mode ", StringComparison.Ordinal))
+        {
+            throw new FormatException("The new line is not a git file mode change header.");
+        }
+
+        return new GitFileModeChange(oldModeLine[9..], newModeLine[9..]);
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)
