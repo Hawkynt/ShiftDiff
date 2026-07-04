@@ -6,7 +6,8 @@ public static class BlockClassifier
         BlockCandidate[] candidates,
         string[] oldLines,
         string[] newLines,
-        DetectionMode mode = DetectionMode.Balanced)
+        DetectionMode mode = DetectionMode.Balanced,
+        int minBlockSize = 1)
     {
         var matches = new BlockMatch[candidates.Length];
         var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
@@ -15,7 +16,8 @@ public static class BlockClassifier
         {
             var candidate = candidates[index];
             var score = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines);
-            var matchType = score >= threshold ? ChangeType.Moved : ChangeType.Uncertain;
+            var blockSize = candidate.OldEnd - candidate.OldStart + 1;
+            var matchType = score >= threshold && blockSize >= minBlockSize ? ChangeType.Moved : ChangeType.Uncertain;
             // Confidence is score-derived only (FR-015), independent of the FR-016 mode
             // threshold — a block can be Uncertain under a strict mode yet still Certain.
             var confidence = ConfidenceClassifier.Classify(score);
