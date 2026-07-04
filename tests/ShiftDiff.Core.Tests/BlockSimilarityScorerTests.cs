@@ -468,4 +468,64 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(0.0, result);
     }
+
+    [Fact]
+    public void RarityWeightedAnchorScore_returns_one_when_both_sides_all_strong()
+    {
+        var oldLines = new[] { "block line Alpha long enough", "block line Beta long enough content" };
+        var newLines = new[] { "block line Alpha long enough", "block line Beta long enough content" };
+        var candidate = new BlockCandidate(0, 1, 0, 1);
+
+        var result = BlockSimilarityScorer.RarityWeightedAnchorScore(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void RarityWeightedAnchorScore_returns_zero_when_both_sides_all_rejected()
+    {
+        var oldLines = new[] { "", "{", "}", "else" };
+        var newLines = new[] { "", "{", "}", "else" };
+        var candidate = new BlockCandidate(0, 3, 0, 3);
+
+        var result = BlockSimilarityScorer.RarityWeightedAnchorScore(candidate, oldLines, newLines);
+
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void RarityWeightedAnchorScore_returns_average_of_each_sides_strong_fraction()
+    {
+        var oldLines = new[]
+        {
+            "unique enough alpha line content",
+            "short",
+            "repeated boilerplate line",
+            "repeated boilerplate line",
+        };
+        var newLines = new[]
+        {
+            "another unique new content line",
+            "second unique new content line",
+            "",
+            "else",
+        };
+        var candidate = new BlockCandidate(0, 3, 0, 3);
+
+        var result = BlockSimilarityScorer.RarityWeightedAnchorScore(candidate, oldLines, newLines);
+
+        Assert.Equal(0.375, result);
+    }
+
+    [Fact]
+    public void RarityWeightedAnchorScore_downgrades_a_line_duplicated_elsewhere_in_the_whole_file()
+    {
+        var oldLines = new[] { "repeated far away line content", "repeated far away line content" };
+        var newLines = new[] { "totally distinct unique content line" };
+        var candidate = new BlockCandidate(1, 1, 0, 0);
+
+        var result = BlockSimilarityScorer.RarityWeightedAnchorScore(candidate, oldLines, newLines);
+
+        Assert.Equal(0.5, result);
+    }
 }

@@ -152,6 +152,33 @@ public static class BlockSimilarityScorer
         return hashes;
     }
 
+    public static double RarityWeightedAnchorScore(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    {
+        var oldAnchors = AnchorDetector.Detect(oldLines);
+        var newAnchors = AnchorDetector.Detect(newLines);
+
+        var oldStrongFraction = StrongFraction(oldAnchors, candidate.OldStart, candidate.OldEnd);
+        var newStrongFraction = StrongFraction(newAnchors, candidate.NewStart, candidate.NewEnd);
+
+        return (oldStrongFraction + newStrongFraction) / 2.0;
+    }
+
+    private static double StrongFraction(LineAnchor[] anchors, int start, int end)
+    {
+        var count = end - start + 1;
+        var strongCount = 0;
+
+        for (var offset = 0; offset < count; offset++)
+        {
+            if (anchors[start + offset].Quality == AnchorQuality.Strong)
+            {
+                strongCount++;
+            }
+        }
+
+        return strongCount / (double)count;
+    }
+
     private static List<string> Tokenize(string line)
     {
         var tokens = new List<string>();
