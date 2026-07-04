@@ -26,6 +26,10 @@ public enum GitFileCreationKind { NewFile, DeletedFile }
 
 public sealed record GitFileCreationMode(GitFileCreationKind Kind, string Mode);
 
+public enum GitSimilarityKind { Similarity, Dissimilarity }
+
+public sealed record GitSimilarityIndex(GitSimilarityKind Kind, int Percentage);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -87,6 +91,33 @@ public static class UnifiedDiffParser
         }
 
         throw new FormatException("The line is not a git file creation or deletion mode header.");
+    }
+
+    public static GitSimilarityIndex ParseSimilarityIndex(string line)
+    {
+        GitSimilarityKind kind;
+        string remainder;
+        if (line.StartsWith("similarity index ", StringComparison.Ordinal))
+        {
+            kind = GitSimilarityKind.Similarity;
+            remainder = line[17..];
+        }
+        else if (line.StartsWith("dissimilarity index ", StringComparison.Ordinal))
+        {
+            kind = GitSimilarityKind.Dissimilarity;
+            remainder = line[20..];
+        }
+        else
+        {
+            throw new FormatException("The line is not a git similarity index header.");
+        }
+
+        if (!remainder.EndsWith('%'))
+        {
+            throw new FormatException("The similarity index line has no percentage sign.");
+        }
+
+        return new GitSimilarityIndex(kind, int.Parse(remainder[..^1]));
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)

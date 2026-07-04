@@ -337,4 +337,32 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileCreationMode("100644"));
     }
+
+    [Fact]
+    public void SimilarityIndexLine_ParsesSimilarityKindAndPercentage()
+    {
+        var index = UnifiedDiffParser.ParseSimilarityIndex("similarity index 100%");
+        Assert.Equal(GitSimilarityKind.Similarity, index.Kind);
+        Assert.Equal(100, index.Percentage);
+    }
+
+    [Fact]
+    public void DissimilarityIndexLine_ParsesDissimilarityKindAndPercentage()
+    {
+        var index = UnifiedDiffParser.ParseSimilarityIndex("dissimilarity index 45%");
+        Assert.Equal(GitSimilarityKind.Dissimilarity, index.Kind);
+        Assert.Equal(45, index.Percentage);
+    }
+
+    [Fact]
+    public void SimilarityIndexLine_MissingPercentSign_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseSimilarityIndex("similarity index 100"));
+    }
+
+    [Fact]
+    public void UnrecognizedSimilarityIndexLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseSimilarityIndex("100%"));
+    }
 }
