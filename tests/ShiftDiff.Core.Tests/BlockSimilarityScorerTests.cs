@@ -360,4 +360,52 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(0.546875, result);
     }
+
+    [Fact]
+    public void BlockSizeRatio_returns_one_for_equal_size_ranges()
+    {
+        var oldLines = new[] { "a", "b", "c", "d" };
+        var newLines = new[] { "w", "x", "y", "z" };
+        var candidate = new BlockCandidate(0, 3, 0, 3);
+
+        var result = BlockSimilarityScorer.BlockSizeRatio(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void BlockSizeRatio_returns_min_over_max_when_old_range_is_bigger()
+    {
+        var oldLines = new[] { "a", "b", "c", "d", "e" };
+        var newLines = new[] { "w", "x" };
+        var candidate = new BlockCandidate(0, 4, 0, 1);
+
+        var result = BlockSimilarityScorer.BlockSizeRatio(candidate, oldLines, newLines);
+
+        Assert.Equal(0.4, result);
+    }
+
+    [Fact]
+    public void BlockSizeRatio_returns_min_over_max_when_new_range_is_bigger()
+    {
+        var oldLines = new[] { "a", "b" };
+        var newLines = new[] { "w", "x", "y", "z", "v" };
+        var candidate = new BlockCandidate(0, 1, 0, 4);
+
+        var result = BlockSimilarityScorer.BlockSizeRatio(candidate, oldLines, newLines);
+
+        Assert.Equal(0.4, result);
+    }
+
+    [Fact]
+    public void BlockSizeRatio_returns_one_for_single_line_both_sides()
+    {
+        var oldLines = new[] { "a" };
+        var newLines = new[] { "w" };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var result = BlockSimilarityScorer.BlockSizeRatio(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
 }

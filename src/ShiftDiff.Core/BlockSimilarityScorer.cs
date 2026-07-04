@@ -84,6 +84,17 @@ public static class BlockSimilarityScorer
         return 1.0 - (distance / (double)FingerprintBits);
     }
 
+    public static double BlockSizeRatio(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    {
+        var oldLineCount = candidate.OldEnd - candidate.OldStart + 1;
+        var newLineCount = candidate.NewEnd - candidate.NewStart + 1;
+
+        var minLineCount = Math.Min(oldLineCount, newLineCount);
+        var maxLineCount = Math.Max(oldLineCount, newLineCount);
+
+        return minLineCount / (double)maxLineCount;
+    }
+
     private static List<string> Tokenize(string line)
     {
         var tokens = new List<string>();
