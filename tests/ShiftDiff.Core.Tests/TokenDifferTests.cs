@@ -44,4 +44,20 @@ public class TokenDifferTests
 
         Assert.Contains(changes, c => c.ChangeType != ChangeType.Unchanged);
     }
+
+    [Fact]
+    public void Diff_WithIgnoreCase_TreatsDifferentlyCasedTokensAsUnchanged()
+    {
+        var changes = TokenDiffer.Diff("The Fox", "the fox", ignoreCase: true);
+
+        Assert.All(changes, c => Assert.Equal(ChangeType.Unchanged, c.ChangeType));
+    }
+
+    [Fact]
+    public void Diff_WithWhitespaceModeRemoveAll_TreatsDifferentWhitespaceRunsAsUnchanged()
+    {
+        var changes = TokenDiffer.Diff("a  b", "a b", whitespaceMode: WhitespaceMode.RemoveAll);
+
+        Assert.All(changes, c => Assert.Equal(ChangeType.Unchanged, c.ChangeType));
+    }
 }
