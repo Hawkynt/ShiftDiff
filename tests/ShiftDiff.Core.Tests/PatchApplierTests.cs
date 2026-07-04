@@ -381,4 +381,99 @@ public class PatchApplierTests
 
         Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyHunkFuzzy(source, hunk));
     }
+
+    [Fact]
+    public void Semantic_TargetBlockMovedElsewhereInFile_AppliesViaBlockIdentityAndReturnsMovedConfidence()
+    {
+        // The hunk's recorded position (line 1) is nowhere near the block's
+        // real location (index 5..7) — a position-based search anchored on
+        // the recorded line would never look there. Semantic mode has to
+        // recognize the block by its own content instead of by line number.
+        var source = new[]
+        {
+            "filler line number one long enough content",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "filler line number five long enough content",
+            "block target Alpha long enough content here",
+            "block target Beta long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number eight long enough content",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+
+        var result = PatchApplier.ApplyHunkSemantic(source, hunk);
+
+        Assert.Equal(new[]
+        {
+            "filler line number one long enough content",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "filler line number five long enough content",
+            "block target Alpha long enough content here",
+            "block target BETA long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number eight long enough content",
+        }, result.Lines);
+        Assert.Equal(PatchApplicationConfidence.Moved, result.Confidence);
+    }
+
+    [Fact]
+    public void Semantic_BlockContentAbsentEverywhereInFile_ThrowsPatchApplicationException()
+    {
+        var source = new[]
+        {
+            "totally unrelated line content number one",
+            "totally unrelated line content number two",
+            "totally unrelated line content number three",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+
+        Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyHunkSemantic(source, hunk));
+    }
+
+    [Fact]
+    public void Semantic_HunkTooShortToFormAStrongAnchor_ThrowsEvenThoughContentExistsInSource()
+    {
+        // "x = 1;" is present verbatim in the source, just like the moved
+        // blocks above — but at 6 characters it is below AnchorDetector's
+        // strong-anchor length floor, so BlockBuilder never pairs it up and
+        // block-identity search has nothing to go on. This mirrors
+        // BlockBuilder's own "too short to be a strong anchor" behavior:
+        // semantic mode inherits that limitation as-is, with no hunk-sized
+        // special casing required.
+        var source = new[]
+        {
+            "some very long filler line to pad the file aaaa",
+            "x = 1;",
+            "another very long filler line to pad the file bb",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 1, 1, 1),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Removed, "x = 1;"),
+                new(UnifiedDiffLineKind.Added, "x = 2;"),
+            });
+
+        Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyHunkSemantic(source, hunk));
+    }
 }

@@ -10,7 +10,8 @@ public sealed class PatchApplicationException : Exception
 public enum PatchApplicationConfidence
 {
     Exact,
-    High
+    High,
+    Moved
 }
 
 public sealed record PatchApplicationResult(IReadOnlyList<string> Lines, PatchApplicationConfidence Confidence);
@@ -144,6 +145,130 @@ public static class PatchApplier
         }
 
         return new PatchApplicationResult(lines, confidence);
+    }
+
+    public static PatchApplicationResult ApplyHunkSemantic(
+        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk, DetectionMode mode = DetectionMode.Balanced)
+    {
+        var oldLines = hunk.Lines
+            .Where(line => line.Kind is UnifiedDiffLineKind.Context or UnifiedDiffLineKind.Removed)
+            .ToList();
+        var newLines = hunk.Lines
+            .Where(line => line.Kind is UnifiedDiffLineKind.Context or UnifiedDiffLineKind.Added)
+            .Select(line => line.Content)
+            .ToList();
+
+        if (oldLines.Count == 0)
+        {
+            var recordedStartIndex = hunk.Header.OldStart - 1;
+            var insertion = new List<string>(sourceLines.Count + newLines.Count);
+            insertion.AddRange(sourceLines.Take(recordedStartIndex));
+            insertion.AddRange(newLines);
+            insertion.AddRange(sourceLines.Skip(recordedStartIndex));
+            return new PatchApplicationResult(insertion, PatchApplicationConfidence.Exact);
+        }
+
+        var hunkOldContent = oldLines.Select(line => line.Content).ToArray();
+        var sourceArray = sourceLines as string[] ?? sourceLines.ToArray();
+
+        var match = FindBestBlockMatch(hunkOldContent, sourceArray, hunk.Header.OldStart - 1, mode);
+        if (match is null)
+        {
+            throw new PatchApplicationException(
+                "Hunk context/removed content was not found anywhere in the source, including via block-identity matching.");
+        }
+
+        var matchStartIndex = match.Value;
+        var result = new List<string>(sourceLines.Count - hunkOldContent.Length + newLines.Count);
+        result.AddRange(sourceLines.Take(matchStartIndex));
+        result.AddRange(newLines);
+        result.AddRange(sourceLines.Skip(matchStartIndex + hunkOldContent.Length));
+        return new PatchApplicationResult(result, PatchApplicationConfidence.Moved);
+    }
+
+    public static PatchApplicationResult ApplyFileSemantic(
+        IReadOnlyList<string> sourceLines, UnifiedDiffFile file, DetectionMode mode = DetectionMode.Balanced)
+    {
+        IReadOnlyList<string> lines = sourceLines;
+        var confidence = PatchApplicationConfidence.Exact;
+        foreach (var hunk in file.Hunks.Reverse())
+        {
+            var hunkResult = ApplyHunkSemantic(lines, hunk, mode);
+            lines = hunkResult.Lines;
+            if (hunkResult.Confidence == PatchApplicationConfidence.Moved)
+            {
+                confidence = PatchApplicationConfidence.Moved;
+            }
+            else if (hunkResult.Confidence == PatchApplicationConfidence.High
+                      && confidence == PatchApplicationConfidence.Exact)
+            {
+                confidence = PatchApplicationConfidence.High;
+            }
+        }
+
+        return new PatchApplicationResult(lines, confidence);
+    }
+
+    // BlockBuilder only pairs up anchor lines individually — for a hunk-sized
+    // fragment some of its own lines may be too short or duplicated to ever
+    // qualify as a strong anchor (see AnchorDetector), so a returned
+    // BlockCandidate may span only part of the fragment rather than all of
+    // it. Each candidate still pins down where the fragment as a whole would
+    // begin in the source (NewStart - OldStart); we re-score that whole
+    // fixed-length window with BlockSimilarityScorer rather than trusting the
+    // candidate's own (possibly partial) span, so partial anchor coverage
+    // doesn't understate a genuinely strong content match. If not a single
+    // line in the fragment is anchor-worthy, BlockBuilder yields no
+    // candidates at all and there is no position to recover — semantic mode
+    // has nothing left to try and reports no match, same as fuzzy mode does.
+    private static int? FindBestBlockMatch(
+        string[] hunkOldContent, string[] sourceArray, int preferredIndex, DetectionMode mode)
+    {
+        var length = hunkOldContent.Length;
+        var lastPossibleStart = sourceArray.Length - length;
+        if (lastPossibleStart < 0)
+        {
+            return null;
+        }
+
+        var candidates = BlockBuilder.Build(hunkOldContent, sourceArray);
+        if (candidates.Length == 0)
+        {
+            return null;
+        }
+
+        var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
+
+        int? bestStartIndex = null;
+        var bestScore = -1.0;
+        var bestDistance = int.MaxValue;
+        var consideredStartIndices = new HashSet<int>();
+
+        foreach (var candidate in candidates)
+        {
+            var startIndex = candidate.NewStart - candidate.OldStart;
+            if (startIndex < 0 || startIndex > lastPossibleStart || !consideredStartIndices.Add(startIndex))
+            {
+                continue;
+            }
+
+            var fullSpanCandidate = new BlockCandidate(0, length - 1, startIndex, startIndex + length - 1);
+            var score = BlockSimilarityScorer.CombinedScore(fullSpanCandidate, hunkOldContent, sourceArray);
+            if (score < threshold || ConfidenceClassifier.Classify(score) == Confidence.Rejected)
+            {
+                continue;
+            }
+
+            var distance = Math.Abs(startIndex - preferredIndex);
+            if (score > bestScore || (score == bestScore && distance < bestDistance))
+            {
+                bestScore = score;
+                bestDistance = distance;
+                bestStartIndex = startIndex;
+            }
+        }
+
+        return bestStartIndex;
     }
 
     private enum MatchKind
