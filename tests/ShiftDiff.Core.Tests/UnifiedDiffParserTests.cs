@@ -227,4 +227,60 @@ public class UnifiedDiffParserTests
         var lines = new[] { "old.txt", "+++ new.txt", "@@ -1,1 +1,1 @@", " a" };
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFile(lines));
     }
+
+    [Fact]
+    public void SingleFile_MatchesStandaloneParseFileResult()
+    {
+        var lines = new[] { "--- old.txt", "+++ new.txt", "@@ -1,3 +1,3 @@", " a", " b", " c" };
+        var patch = UnifiedDiffParser.ParsePatch(lines);
+        var expectedFile = UnifiedDiffParser.ParseFile(lines);
+        Assert.Single(patch.Files);
+        Assert.Equal(expectedFile.Header, patch.Files[0].Header);
+        Assert.Equal(expectedFile.Hunks.Count, patch.Files[0].Hunks.Count);
+        Assert.Equal(expectedFile.Hunks[0].Header, patch.Files[0].Hunks[0].Header);
+        Assert.Equal(expectedFile.Hunks[0].Lines, patch.Files[0].Hunks[0].Lines);
+    }
+
+    [Fact]
+    public void MultipleFiles_ParsedInOrderWithCorrectPaths()
+    {
+        var lines = new[]
+        {
+            "--- a/old1.txt", "+++ b/new1.txt",
+            "@@ -1,2 +1,2 @@", " a", "-b",
+            "--- a/old2.txt", "+++ b/new2.txt",
+            "@@ -10,2 +10,2 @@", " x", "+y",
+        };
+        var patch = UnifiedDiffParser.ParsePatch(lines);
+        Assert.Equal(2, patch.Files.Count);
+        Assert.Equal("a/old1.txt", patch.Files[0].Header.SourcePath);
+        Assert.Equal("b/new1.txt", patch.Files[0].Header.TargetPath);
+        Assert.Equal("a/old2.txt", patch.Files[1].Header.SourcePath);
+        Assert.Equal("b/new2.txt", patch.Files[1].Header.TargetPath);
+    }
+
+    [Fact]
+    public void EmptyInput_ParsesEmptyFilesCollection()
+    {
+        var patch = UnifiedDiffParser.ParsePatch(Array.Empty<string>());
+        Assert.Empty(patch.Files);
+    }
+
+    [Fact]
+    public void FirstLineNotAFileHeader_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParsePatch(new[] { "@@ -1,1 +1,1 @@", " a" }));
+    }
+
+    [Fact]
+    public void SecondFileMissingNewLine_PropagatesFormatException()
+    {
+        var lines = new[]
+        {
+            "--- a/old1.txt", "+++ b/new1.txt",
+            "@@ -1,1 +1,1 @@", " a",
+            "--- a/old2.txt", "@@ -1,1 +1,1 @@", " a",
+        };
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParsePatch(lines));
+    }
 }

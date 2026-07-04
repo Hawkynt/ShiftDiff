@@ -14,6 +14,8 @@ public sealed record UnifiedDiffHunk(UnifiedDiffHunkHeader Header, IReadOnlyList
 
 public sealed record UnifiedDiffFile(UnifiedDiffFileHeader Header, IReadOnlyList<UnifiedDiffHunk> Hunks);
 
+public sealed record UnifiedDiffPatch(IReadOnlyList<UnifiedDiffFile> Files);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -125,5 +127,34 @@ public static class UnifiedDiffParser
         }
 
         return new UnifiedDiffFile(header, hunks);
+    }
+
+    public static UnifiedDiffPatch ParsePatch(IReadOnlyList<string> lines)
+    {
+        if (lines.Count == 0)
+        {
+            return new UnifiedDiffPatch(Array.Empty<UnifiedDiffFile>());
+        }
+
+        if (!lines[0].StartsWith("--- ", StringComparison.Ordinal))
+        {
+            throw new FormatException("Expected a file header line.");
+        }
+
+        var files = new List<UnifiedDiffFile>();
+        var index = 0;
+        while (index < lines.Count)
+        {
+            var blockStart = index;
+            index++;
+            while (index < lines.Count && !lines[index].StartsWith("--- ", StringComparison.Ordinal))
+            {
+                index++;
+            }
+
+            files.Add(ParseFile(lines.Skip(blockStart).Take(index - blockStart).ToList()));
+        }
+
+        return new UnifiedDiffPatch(files);
     }
 }
