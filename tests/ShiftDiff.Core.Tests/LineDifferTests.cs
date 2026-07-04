@@ -177,4 +177,54 @@ public class LineDifferTests
         Assert.Equal(1, result[1].OldIndex);
         Assert.Equal(1, result[1].NewIndex);
     }
+
+    [Fact]
+    public void Diff_treats_case_different_line_as_edited_by_default()
+    {
+        var oldLines = new[] { "a", "b" };
+        var newLines = new[] { "a", "B" };
+
+        var result = LineDiffer.Diff(oldLines, newLines);
+
+        Assert.Equal(ChangeType.Edited, result[1].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_treats_case_different_line_as_unchanged_when_ignoreCase_is_true()
+    {
+        var oldLines = new[] { "a", "b" };
+        var newLines = new[] { "a", "B" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, ignoreCase: true);
+
+        Assert.Equal(ChangeType.Unchanged, result[1].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_preserves_original_case_content_when_ignoreCase_matches_lines_as_unchanged()
+    {
+        var oldLines = new[] { "Hello" };
+        var newLines = new[] { "HELLO" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, ignoreCase: true);
+
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+        Assert.Equal("Hello", result[0].OldLine);
+        Assert.Equal("HELLO", result[0].NewLine);
+    }
+
+    [Fact]
+    public void Diff_with_ignoreCase_still_realigns_after_a_case_only_insertion()
+    {
+        var oldLines = new[] { "A", "b", "c" };
+        var newLines = new[] { "A", "X", "b", "C" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, ignoreCase: true);
+
+        Assert.Equal(4, result.Length);
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+        Assert.Equal(ChangeType.Added, result[1].ChangeType);
+        Assert.Equal(ChangeType.Unchanged, result[2].ChangeType);
+        Assert.Equal(ChangeType.Unchanged, result[3].ChangeType);
+    }
 }

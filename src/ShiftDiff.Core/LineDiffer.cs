@@ -6,14 +6,15 @@ public static class LineDiffer
     // oldLines[i..] and newLines[j..]. Backtracking forward from (0, 0) and
     // preferring the branch with the longer remaining LCS yields the usual
     // "diff" output (minimal Added/Removed set around a common subsequence).
-    public static LineChange[] Diff(string[] oldLines, string[] newLines)
+    public static LineChange[] Diff(string[] oldLines, string[] newLines, bool ignoreCase = false)
     {
-        var dp = BuildLcsLengthTable(oldLines, newLines);
-        var rawChanges = Backtrack(oldLines, newLines, dp);
+        var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var dp = BuildLcsLengthTable(oldLines, newLines, comparison);
+        var rawChanges = Backtrack(oldLines, newLines, dp, comparison);
         return CoalesceAdjacentRemovedAndAddedIntoEdited(rawChanges);
     }
 
-    private static int[,] BuildLcsLengthTable(string[] oldLines, string[] newLines)
+    private static int[,] BuildLcsLengthTable(string[] oldLines, string[] newLines, StringComparison comparison)
     {
         var dp = new int[oldLines.Length + 1, newLines.Length + 1];
 
@@ -21,7 +22,7 @@ public static class LineDiffer
         {
             for (var j = newLines.Length - 1; j >= 0; j--)
             {
-                dp[i, j] = oldLines[i] == newLines[j]
+                dp[i, j] = string.Equals(oldLines[i], newLines[j], comparison)
                     ? dp[i + 1, j + 1] + 1
                     : Math.Max(dp[i + 1, j], dp[i, j + 1]);
             }
@@ -30,7 +31,7 @@ public static class LineDiffer
         return dp;
     }
 
-    private static List<LineChange> Backtrack(string[] oldLines, string[] newLines, int[,] dp)
+    private static List<LineChange> Backtrack(string[] oldLines, string[] newLines, int[,] dp, StringComparison comparison)
     {
         var result = new List<LineChange>();
         var i = 0;
@@ -38,7 +39,7 @@ public static class LineDiffer
 
         while (i < oldLines.Length && j < newLines.Length)
         {
-            if (oldLines[i] == newLines[j])
+            if (string.Equals(oldLines[i], newLines[j], comparison))
             {
                 result.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[j], OldIndex: i, NewIndex: j));
                 i++;
