@@ -88,4 +88,48 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileHeader("--- old.txt", "new.txt"));
     }
+
+    [Fact]
+    public void AddedLine_ParsesKindAndContent()
+    {
+        var line = UnifiedDiffParser.ParseLine("+new text");
+        Assert.Equal(UnifiedDiffLineKind.Added, line.Kind);
+        Assert.Equal("new text", line.Content);
+    }
+
+    [Fact]
+    public void RemovedLine_ParsesKindAndContent()
+    {
+        var line = UnifiedDiffParser.ParseLine("-old text");
+        Assert.Equal(UnifiedDiffLineKind.Removed, line.Kind);
+        Assert.Equal("old text", line.Content);
+    }
+
+    [Fact]
+    public void ContextLine_ParsesKindAndContent()
+    {
+        var line = UnifiedDiffParser.ParseLine(" unchanged text");
+        Assert.Equal(UnifiedDiffLineKind.Context, line.Kind);
+        Assert.Equal("unchanged text", line.Content);
+    }
+
+    [Fact]
+    public void BareMarker_ParsesEmptyContent()
+    {
+        var line = UnifiedDiffParser.ParseLine("+");
+        Assert.Equal(UnifiedDiffLineKind.Added, line.Kind);
+        Assert.Equal("", line.Content);
+    }
+
+    [Fact]
+    public void UnrecognizedPrefix_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseLine("@oops"));
+    }
+
+    [Fact]
+    public void EmptyString_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseLine(""));
+    }
 }

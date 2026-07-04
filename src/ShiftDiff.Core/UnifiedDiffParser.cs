@@ -6,6 +6,10 @@ public sealed record UnifiedDiffHunkHeader(int OldStart, int OldCount, int NewSt
 
 public sealed record UnifiedDiffFileHeader(string SourcePath, string TargetPath);
 
+public enum UnifiedDiffLineKind { Context, Added, Removed }
+
+public sealed record UnifiedDiffLine(UnifiedDiffLineKind Kind, string Content);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -59,5 +63,23 @@ public static class UnifiedDiffParser
         }
 
         return int.Parse(group.Value);
+    }
+
+    public static UnifiedDiffLine ParseLine(string line)
+    {
+        if (line.Length == 0)
+        {
+            throw new FormatException("The line is empty.");
+        }
+
+        var kind = line[0] switch
+        {
+            '+' => UnifiedDiffLineKind.Added,
+            '-' => UnifiedDiffLineKind.Removed,
+            ' ' => UnifiedDiffLineKind.Context,
+            _ => throw new FormatException("The line does not start with a recognized unified diff marker."),
+        };
+
+        return new UnifiedDiffLine(kind, line[1..]);
     }
 }
