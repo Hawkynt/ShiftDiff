@@ -42,7 +42,7 @@ public class BlockClassifierTests
         var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
         var match = Assert.Single(result);
-        Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875), match);
+        Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875, Confidence.Certain), match);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class BlockClassifierTests
         var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
         var match = Assert.Single(result);
-        Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875), match);
+        Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875, Confidence.Certain), match);
     }
 
     [Fact]
@@ -136,5 +136,6 @@ public class BlockClassifierTests
         var match = Assert.Single(result);
         Assert.Equal(ChangeType.Uncertain, match.MatchType);
         Assert.Equal(0.4036458333333333, match.Score, 15);
+        Assert.Equal(Confidence.Weak, match.Confidence);
     }
 }

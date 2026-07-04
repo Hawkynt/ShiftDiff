@@ -13,13 +13,15 @@ public static class BlockClassifier
             var candidate = candidates[index];
             var score = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines);
             var matchType = score >= MovedConfidenceThreshold ? ChangeType.Moved : ChangeType.Uncertain;
+            var confidence = ConfidenceClassifier.Classify(score);
             matches[index] = new BlockMatch(
                 candidate.OldStart,
                 candidate.OldEnd,
                 candidate.NewStart,
                 candidate.NewEnd,
                 matchType,
-                score);
+                score,
+                confidence);
         }
 
         return matches;
