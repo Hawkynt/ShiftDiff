@@ -106,4 +106,63 @@ public class FolderChangeFilterTests
             new[] { "a.cs", "d.md" },
             result.Select(e => e.RelativePath));
     }
+
+    private static FolderEntryChange[] SizedSampleChanges() =>
+        new[]
+        {
+            new FolderEntryChange("a.cs", FolderChangeType.Added, Size: 100),
+            new FolderEntryChange("b.txt", FolderChangeType.Removed, Size: 50),
+            new FolderEntryChange("nested/c.CS", FolderChangeType.Changed, Size: 200),
+            new FolderEntryChange("d.md", FolderChangeType.Unchanged, Size: 10),
+        };
+
+    [Fact]
+    public void BySize_MinOnly_KeepsEntriesAtOrAboveMin()
+    {
+        var result = FolderChangeFilter.BySize(SizedSampleChanges(), minSize: 100);
+
+        Assert.Equal(
+            new[] { "a.cs", "nested/c.CS" },
+            result.Select(e => e.RelativePath));
+    }
+
+    [Fact]
+    public void BySize_MaxOnly_KeepsEntriesAtOrBelowMax()
+    {
+        var result = FolderChangeFilter.BySize(SizedSampleChanges(), maxSize: 50);
+
+        Assert.Equal(
+            new[] { "b.txt", "d.md" },
+            result.Select(e => e.RelativePath));
+    }
+
+    [Fact]
+    public void BySize_MinAndMax_KeepsWithinRange()
+    {
+        var result = FolderChangeFilter.BySize(SizedSampleChanges(), minSize: 60, maxSize: 150);
+
+        Assert.Equal(
+            new[] { "a.cs" },
+            result.Select(e => e.RelativePath));
+    }
+
+    [Fact]
+    public void BySize_NoBoundsGiven_ReturnsAllUnfiltered()
+    {
+        var changes = SizedSampleChanges();
+
+        var result = FolderChangeFilter.BySize(changes);
+
+        Assert.Equal(changes, result);
+    }
+
+    [Fact]
+    public void BySize_PreservesInputOrder()
+    {
+        var result = FolderChangeFilter.BySize(SizedSampleChanges(), minSize: 10);
+
+        Assert.Equal(
+            new[] { "a.cs", "b.txt", "nested/c.CS", "d.md" },
+            result.Select(e => e.RelativePath));
+    }
 }

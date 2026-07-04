@@ -31,4 +31,21 @@ public static class FolderChangeFilter
                 c.RelativePath.StartsWith(p, StringComparison.Ordinal)))
             .ToArray();
     }
+
+    public static FolderEntryChange[] BySize(
+        IReadOnlyList<FolderEntryChange> changes,
+        long? minSize = null,
+        long? maxSize = null)
+    {
+        if (minSize is null && maxSize is null)
+        {
+            return changes.ToArray();
+        }
+
+        return changes
+            .Where(c => c.Size is long size
+                && (minSize is null || size >= minSize)
+                && (maxSize is null || size <= maxSize))
+            .ToArray();
+    }
 }

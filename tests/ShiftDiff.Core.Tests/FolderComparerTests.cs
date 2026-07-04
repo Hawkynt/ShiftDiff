@@ -96,4 +96,67 @@ public class FolderComparerTests
             new[] { "Zeta.txt", "alpha.txt", "beta.txt" },
             result.Select(e => e.RelativePath));
     }
+
+    [Fact]
+    public void Compare_AddedEntry_SizeIsTargetContentLength()
+    {
+        var baseFiles = new Dictionary<string, byte[]>();
+        var targetFiles = new Dictionary<string, byte[]>
+        {
+            ["new.txt"] = new byte[] { 1, 2, 3, 4 },
+        };
+
+        var result = FolderComparer.Compare(baseFiles, targetFiles);
+
+        var added = Assert.Single(result);
+        Assert.Equal(4, added.Size);
+    }
+
+    [Fact]
+    public void Compare_RemovedEntry_SizeIsBaseContentLength()
+    {
+        var baseFiles = new Dictionary<string, byte[]>
+        {
+            ["gone.txt"] = new byte[] { 1, 2, 3 },
+        };
+        var targetFiles = new Dictionary<string, byte[]>();
+
+        var result = FolderComparer.Compare(baseFiles, targetFiles);
+
+        var removed = Assert.Single(result);
+        Assert.Equal(3, removed.Size);
+    }
+
+    [Fact]
+    public void Compare_ChangedEntry_SizeIsTargetContentLength()
+    {
+        var baseFiles = new Dictionary<string, byte[]>
+        {
+            ["a.txt"] = new byte[] { 1, 2, 3 },
+        };
+        var targetFiles = new Dictionary<string, byte[]>
+        {
+            ["a.txt"] = new byte[] { 1, 2, 3, 4, 5 },
+        };
+
+        var result = FolderComparer.Compare(baseFiles, targetFiles);
+
+        var changed = Assert.Single(result);
+        Assert.Equal(5, changed.Size);
+    }
+
+    [Fact]
+    public void Compare_UnchangedEntry_SizeIsContentLength()
+    {
+        var baseFiles = new Dictionary<string, byte[]>
+        {
+            ["a.txt"] = new byte[] { 1, 2 },
+        };
+        var targetFiles = new Dictionary<string, byte[]>(baseFiles);
+
+        var result = FolderComparer.Compare(baseFiles, targetFiles);
+
+        var unchanged = Assert.Single(result);
+        Assert.Equal(2, unchanged.Size);
+    }
 }

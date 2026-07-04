@@ -5,7 +5,8 @@ public enum FolderChangeType { Added, Removed, Changed, Unchanged, Moved }
 public sealed record FolderEntryChange(
     string RelativePath,
     FolderChangeType ChangeType,
-    string? MovedFrom = null);
+    string? MovedFrom = null,
+    long? Size = null);
 
 public static class FolderComparer
 {
@@ -26,7 +27,8 @@ public static class FolderComparer
                 _ => BinaryFileDetector.AreEqual(baseContent!, targetContent!)
                     ? FolderChangeType.Unchanged : FolderChangeType.Changed,
             };
-            result.Add(new FolderEntryChange(path, type));
+            var size = inTarget ? targetContent!.Length : baseContent!.Length;
+            result.Add(new FolderEntryChange(path, type, Size: size));
         }
         return result.ToArray();
     }
