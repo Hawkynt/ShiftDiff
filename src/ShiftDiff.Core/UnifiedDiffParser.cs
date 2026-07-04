@@ -22,6 +22,10 @@ public sealed record UnifiedDiffPatch(IReadOnlyList<UnifiedDiffFile> Files);
 
 public sealed record GitFileModeChange(string OldMode, string NewMode);
 
+public enum GitFileCreationKind { NewFile, DeletedFile }
+
+public sealed record GitFileCreationMode(GitFileCreationKind Kind, string Mode);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -68,6 +72,21 @@ public static class UnifiedDiffParser
         }
 
         return new GitFileModeChange(oldModeLine[9..], newModeLine[9..]);
+    }
+
+    public static GitFileCreationMode ParseFileCreationMode(string line)
+    {
+        if (line.StartsWith("new file mode ", StringComparison.Ordinal))
+        {
+            return new GitFileCreationMode(GitFileCreationKind.NewFile, line[14..]);
+        }
+
+        if (line.StartsWith("deleted file mode ", StringComparison.Ordinal))
+        {
+            return new GitFileCreationMode(GitFileCreationKind.DeletedFile, line[18..]);
+        }
+
+        throw new FormatException("The line is not a git file creation or deletion mode header.");
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)

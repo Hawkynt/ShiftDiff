@@ -315,4 +315,26 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileModeChange("old mode 100644", "100755"));
     }
+
+    [Fact]
+    public void NewFileLine_ParsesNewFileKindAndMode()
+    {
+        var creation = UnifiedDiffParser.ParseFileCreationMode("new file mode 100644");
+        Assert.Equal(GitFileCreationKind.NewFile, creation.Kind);
+        Assert.Equal("100644", creation.Mode);
+    }
+
+    [Fact]
+    public void DeletedFileLine_ParsesDeletedFileKindAndMode()
+    {
+        var creation = UnifiedDiffParser.ParseFileCreationMode("deleted file mode 100644");
+        Assert.Equal(GitFileCreationKind.DeletedFile, creation.Kind);
+        Assert.Equal("100644", creation.Mode);
+    }
+
+    [Fact]
+    public void UnrecognizedCreationLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileCreationMode("100644"));
+    }
 }
