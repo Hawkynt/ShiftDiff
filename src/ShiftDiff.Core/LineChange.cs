@@ -1,3 +1,3 @@
 namespace ShiftDiff.Core;
 
-public sealed record LineChange(ChangeType ChangeType);
+public sealed record LineChange(ChangeType ChangeType, string? OldLine = null, string? NewLine = null);
