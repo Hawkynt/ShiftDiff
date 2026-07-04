@@ -50,4 +50,42 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseHunkHeader("not a hunk header"));
     }
+
+    [Fact]
+    public void PlainPaths_NoSuffix_ParsesBothPaths()
+    {
+        var header = UnifiedDiffParser.ParseFileHeader("--- old.txt", "+++ new.txt");
+        Assert.Equal("old.txt", header.SourcePath);
+        Assert.Equal("new.txt", header.TargetPath);
+    }
+
+    [Fact]
+    public void TabSeparatedTimestampSuffix_IsStripped()
+    {
+        var header = UnifiedDiffParser.ParseFileHeader(
+            "--- old.txt\t2024-01-01 00:00:00",
+            "+++ new.txt\t2024-01-02 00:00:00");
+        Assert.Equal("old.txt", header.SourcePath);
+        Assert.Equal("new.txt", header.TargetPath);
+    }
+
+    [Fact]
+    public void GitStylePrefix_IsKeptVerbatim()
+    {
+        var header = UnifiedDiffParser.ParseFileHeader("--- a/src/Foo.cs", "+++ b/src/Foo.cs");
+        Assert.Equal("a/src/Foo.cs", header.SourcePath);
+        Assert.Equal("b/src/Foo.cs", header.TargetPath);
+    }
+
+    [Fact]
+    public void MalformedOldLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileHeader("old.txt", "+++ new.txt"));
+    }
+
+    [Fact]
+    public void MalformedNewLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFileHeader("--- old.txt", "new.txt"));
+    }
 }
