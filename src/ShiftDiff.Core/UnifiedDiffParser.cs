@@ -16,7 +16,7 @@ public sealed record UnifiedDiffLine(UnifiedDiffLineKind Kind, string Content);
 
 public sealed record UnifiedDiffHunk(UnifiedDiffHunkHeader Header, IReadOnlyList<UnifiedDiffLine> Lines);
 
-public sealed record UnifiedDiffFile(UnifiedDiffFileHeader Header, IReadOnlyList<UnifiedDiffHunk> Hunks);
+public sealed record UnifiedDiffFile(UnifiedDiffFileHeader Header, IReadOnlyList<UnifiedDiffHunk> Hunks, GitExtendedHeader? GitHeader = null);
 
 public sealed record UnifiedDiffPatch(IReadOnlyList<UnifiedDiffFile> Files);
 
@@ -37,6 +37,14 @@ public sealed record GitRenameCopyMetadata(GitRenameCopyKind Kind, string Source
 public sealed record GitIndexHash(string OldHash, string NewHash, string? Mode);
 
 public sealed record GitDiffHeader(string OldPath, string NewPath);
+
+public sealed record GitExtendedHeader(
+    GitDiffHeader Header,
+    GitFileModeChange? ModeChange,
+    GitFileCreationMode? CreationMode,
+    GitSimilarityIndex? SimilarityIndex,
+    GitRenameCopyMetadata? RenameCopyMetadata,
+    GitIndexHash? IndexHash);
 
 public static class UnifiedDiffParser
 {
@@ -277,10 +285,61 @@ public static class UnifiedDiffParser
             throw new FormatException("A unified diff file needs at least two header lines.");
         }
 
-        var header = ParseFileHeader(lines[0], lines[1]);
+        GitExtendedHeader? gitHeader = null;
+        var index = 0;
+        if (lines[0].StartsWith("diff --git ", StringComparison.Ordinal))
+        {
+            var diffHeader = ParseGitDiffHeader(lines[0]);
+            GitFileModeChange? modeChange = null;
+            GitFileCreationMode? creationMode = null;
+            GitSimilarityIndex? similarityIndex = null;
+            GitRenameCopyMetadata? renameCopyMetadata = null;
+            GitIndexHash? indexHash = null;
+            index = 1;
+            while (index < lines.Count)
+            {
+                var line = lines[index];
+                if (line.StartsWith("old mode ", StringComparison.Ordinal))
+                {
+                    modeChange = ParseFileModeChange(line, lines[index + 1]);
+                    index += 2;
+                }
+                else if (line.StartsWith("new file mode ", StringComparison.Ordinal) ||
+                         line.StartsWith("deleted file mode ", StringComparison.Ordinal))
+                {
+                    creationMode = ParseFileCreationMode(line);
+                    index += 1;
+                }
+                else if (line.StartsWith("similarity index ", StringComparison.Ordinal) ||
+                         line.StartsWith("dissimilarity index ", StringComparison.Ordinal))
+                {
+                    similarityIndex = ParseSimilarityIndex(line);
+                    index += 1;
+                }
+                else if (line.StartsWith("rename from ", StringComparison.Ordinal) ||
+                         line.StartsWith("copy from ", StringComparison.Ordinal))
+                {
+                    renameCopyMetadata = ParseRenameCopyMetadata(line, lines[index + 1]);
+                    index += 2;
+                }
+                else if (line.StartsWith("index ", StringComparison.Ordinal))
+                {
+                    indexHash = ParseIndexHash(line);
+                    index += 1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            gitHeader = new GitExtendedHeader(diffHeader, modeChange, creationMode, similarityIndex, renameCopyMetadata, indexHash);
+        }
+
+        var header = ParseFileHeader(lines[index], lines[index + 1]);
+        index += 2;
 
         var hunks = new List<UnifiedDiffHunk>();
-        var index = 2;
         while (index < lines.Count)
         {
             if (!lines[index].StartsWith("@@", StringComparison.Ordinal))
@@ -300,7 +359,7 @@ public static class UnifiedDiffParser
             hunks.Add(ParseHunk(headerLine, lines.Skip(bodyStart).Take(index - bodyStart).ToList()));
         }
 
-        return new UnifiedDiffFile(header, hunks);
+        return new UnifiedDiffFile(header, hunks, gitHeader);
     }
 
     public static UnifiedDiffPatch ParsePatch(IReadOnlyList<string> lines)
@@ -310,7 +369,8 @@ public static class UnifiedDiffParser
             return new UnifiedDiffPatch(Array.Empty<UnifiedDiffFile>());
         }
 
-        if (!lines[0].StartsWith("--- ", StringComparison.Ordinal))
+        if (!lines[0].StartsWith("--- ", StringComparison.Ordinal) &&
+            !lines[0].StartsWith("diff --git ", StringComparison.Ordinal))
         {
             throw new FormatException("Expected a file header line.");
         }
@@ -321,7 +381,24 @@ public static class UnifiedDiffParser
         {
             var blockStart = index;
             index++;
-            while (index < lines.Count && !lines[index].StartsWith("--- ", StringComparison.Ordinal))
+            if (lines[blockStart].StartsWith("diff --git ", StringComparison.Ordinal))
+            {
+                // Skip past this block's own "--- "/"+++ " pair before scanning for the
+                // next block's boundary, or it would be mistaken for a new file's start.
+                while (index < lines.Count && !lines[index].StartsWith("--- ", StringComparison.Ordinal))
+                {
+                    index++;
+                }
+
+                if (index < lines.Count)
+                {
+                    index += 2;
+                }
+            }
+
+            while (index < lines.Count &&
+                   !lines[index].StartsWith("--- ", StringComparison.Ordinal) &&
+                   !lines[index].StartsWith("diff --git ", StringComparison.Ordinal))
             {
                 index++;
             }

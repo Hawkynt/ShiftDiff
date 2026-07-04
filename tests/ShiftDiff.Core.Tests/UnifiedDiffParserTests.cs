@@ -461,4 +461,85 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseGitDiffHeader("diff --git a/foo.txt"));
     }
+
+    [Fact]
+    public void ParseFile_WithGitDiffHeaderPreamble_PopulatesGitHeaderAndParsesHunksNormally()
+    {
+        var lines = new[]
+        {
+            "diff --git a/foo.txt b/foo.txt",
+            "--- a/foo.txt", "+++ b/foo.txt",
+            "@@ -1,3 +1,3 @@", " a", " b", " c",
+        };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.NotNull(file.GitHeader);
+        Assert.Equal("foo.txt", file.GitHeader!.Header.OldPath);
+        Assert.Equal("foo.txt", file.GitHeader!.Header.NewPath);
+        Assert.Null(file.GitHeader!.ModeChange);
+        Assert.Null(file.GitHeader!.CreationMode);
+        Assert.Null(file.GitHeader!.SimilarityIndex);
+        Assert.Null(file.GitHeader!.RenameCopyMetadata);
+        Assert.Null(file.GitHeader!.IndexHash);
+        var expectedHunk = UnifiedDiffParser.ParseHunk("@@ -1,3 +1,3 @@", new[] { " a", " b", " c" });
+        Assert.Single(file.Hunks);
+        Assert.Equal(expectedHunk.Header, file.Hunks[0].Header);
+        Assert.Equal(expectedHunk.Lines, file.Hunks[0].Lines);
+    }
+
+    [Fact]
+    public void ParseFile_WithGitModeChangePreamble_PopulatesModeChange()
+    {
+        var lines = new[]
+        {
+            "diff --git a/foo.txt b/foo.txt",
+            "old mode 100644", "new mode 100755",
+            "--- a/foo.txt", "+++ b/foo.txt",
+            "@@ -1,1 +1,1 @@", " a",
+        };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.NotNull(file.GitHeader);
+        Assert.Equal("100644", file.GitHeader!.ModeChange!.OldMode);
+        Assert.Equal("100755", file.GitHeader!.ModeChange!.NewMode);
+    }
+
+    [Fact]
+    public void ParseFile_WithGitRenamePreamble_PopulatesRenameCopyMetadata()
+    {
+        var lines = new[]
+        {
+            "diff --git a/old.txt b/foo.txt",
+            "rename from old.txt", "rename to foo.txt",
+            "--- a/old.txt", "+++ b/foo.txt",
+            "@@ -1,1 +1,1 @@", " a",
+        };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.NotNull(file.GitHeader);
+        Assert.Equal(GitRenameCopyKind.Rename, file.GitHeader!.RenameCopyMetadata!.Kind);
+    }
+
+    [Fact]
+    public void ParseFile_WithoutGitDiffHeaderPreamble_GitHeaderIsNull()
+    {
+        var lines = new[] { "--- old.txt", "+++ new.txt", "@@ -1,3 +1,3 @@", " a", " b", " c" };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.Null(file.GitHeader);
+    }
+
+    [Fact]
+    public void ParsePatch_WithTwoBackToBackGitStyleBlocks_ParsesBothFilesWithCorrectGitHeaders()
+    {
+        var lines = new[]
+        {
+            "diff --git a/old1.txt b/old1.txt",
+            "--- a/old1.txt", "+++ b/old1.txt",
+            "@@ -1,2 +1,2 @@", " a", "-b",
+            "diff --git a/old2.txt b/old2.txt",
+            "--- a/old2.txt", "+++ b/old2.txt",
+            "@@ -10,2 +10,2 @@", " x", "+y",
+        };
+        var patch = UnifiedDiffParser.ParsePatch(lines);
+        Assert.Equal(2, patch.Files.Count);
+        Assert.Equal("old1.txt", patch.Files[0].GitHeader!.Header.OldPath);
+        Assert.Equal("old2.txt", patch.Files[1].GitHeader!.Header.OldPath);
+    }
 }
