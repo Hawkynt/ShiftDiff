@@ -59,4 +59,51 @@ public class FolderChangeFilterTests
             new[] { "a.cs", "nested/c.CS", "d.md" },
             result.Select(e => e.RelativePath));
     }
+
+    [Fact]
+    public void ByPathPrefix_KeepsOnlyMatchingPrefix()
+    {
+        var result = FolderChangeFilter.ByPathPrefix(SampleChanges(), "nested/");
+
+        var kept = Assert.Single(result);
+        Assert.Equal("nested/c.CS", kept.RelativePath);
+    }
+
+    [Fact]
+    public void ByPathPrefix_MultiplePrefixes_KeepsAnyMatch()
+    {
+        var result = FolderChangeFilter.ByPathPrefix(SampleChanges(), "nested/", "b.");
+
+        Assert.Equal(
+            new[] { "b.txt", "nested/c.CS" },
+            result.Select(e => e.RelativePath));
+    }
+
+    [Fact]
+    public void ByPathPrefix_NoPrefixesGiven_ReturnsAllUnfiltered()
+    {
+        var changes = SampleChanges();
+
+        var result = FolderChangeFilter.ByPathPrefix(changes);
+
+        Assert.Equal(changes, result);
+    }
+
+    [Fact]
+    public void ByPathPrefix_IsCaseSensitive()
+    {
+        var result = FolderChangeFilter.ByPathPrefix(SampleChanges(), "Nested/");
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ByPathPrefix_PreservesInputOrder()
+    {
+        var result = FolderChangeFilter.ByPathPrefix(SampleChanges(), "d.", "a.");
+
+        Assert.Equal(
+            new[] { "a.cs", "d.md" },
+            result.Select(e => e.RelativePath));
+    }
 }
