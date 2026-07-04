@@ -138,4 +138,61 @@ public class BlockClassifierTests
         Assert.Equal(0.4036458333333333, match.Score, 15);
         Assert.Equal(Confidence.Weak, match.Confidence);
     }
+
+    [Fact]
+    public void Classify_applies_strict_mode_threshold_but_leaves_confidence_score_derived()
+    {
+        var oldLines = new[]
+        {
+            "filler original line zero content aaa",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "filler new line zero content bbb",
+            "filler new line one content ccc",
+            "filler new line two content ddd",
+            "filler new line three content eee",
+            "filler new line four content fff",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Strict);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Uncertain, match.MatchType);
+        Assert.Equal(Confidence.Certain, match.Confidence);
+    }
+
+    [Fact]
+    public void Classify_applies_aggressive_mode_threshold_and_marks_previously_uncertain_candidate_as_moved()
+    {
+        var oldLines = new[]
+        {
+            "context before line zero old side aaa",
+            "totally unrelated old content xyz123",
+            "different structure entirely qqq999",
+            "context after line old side bbb",
+        };
+        var newLines = new[]
+        {
+            "context before line zero new side ccc",
+            "completely different new stuff foo456",
+            "nothing in common here at all zzz000",
+            "another line making it three long here",
+            "context after line new side ddd",
+        };
+        var candidates = new[] { new BlockCandidate(1, 2, 1, 3) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Aggressive);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Moved, match.MatchType);
+        Assert.Equal(Confidence.Weak, match.Confidence);
+    }
 }
