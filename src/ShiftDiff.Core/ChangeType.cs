@@ -8,5 +8,7 @@ public enum ChangeType
     Removed,
     Moved,
     MovedEdited,
+    Split,
+    Merged,
     Uncertain
 }
