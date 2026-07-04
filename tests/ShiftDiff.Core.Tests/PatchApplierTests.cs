@@ -317,4 +317,68 @@ public class PatchApplierTests
         Assert.Equal(new[] { "A", "b", "c", "d", "z", "E" }, result.Lines);
         Assert.Equal(PatchApplicationConfidence.High, result.Confidence);
     }
+
+    [Fact]
+    public void Fuzzy_LeadingContextLineDrifted_AppliesAndPreservesSourceLeadingLine()
+    {
+        // "a" was edited to "a2" by an unrelated prior change; the Removed/
+        // trailing-Context lines still match verbatim at the recorded position.
+        var source = new[] { "a2", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var result = PatchApplier.ApplyHunkFuzzy(source, hunk);
+
+        Assert.Equal(new[] { "a2", "B", "c" }, result.Lines);
+        Assert.Equal(PatchApplicationConfidence.High, result.Confidence);
+    }
+
+    [Fact]
+    public void Fuzzy_TrailingContextLineDrifted_AppliesAndPreservesSourceTrailingLine()
+    {
+        // "c" was edited to "c2" by an unrelated prior change; the leading
+        // Context/Removed lines still match verbatim at the recorded position.
+        var source = new[] { "a", "b", "c2" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var result = PatchApplier.ApplyHunkFuzzy(source, hunk);
+
+        Assert.Equal(new[] { "a", "B", "c2" }, result.Lines);
+        Assert.Equal(PatchApplicationConfidence.High, result.Confidence);
+    }
+
+    [Fact]
+    public void Fuzzy_RemovedLineMismatch_StillThrowsEvenWithDriftTolerantContext()
+    {
+        // Context lines match fine, but the Removed line itself ("b") was
+        // replaced by unrelated content ("x") — drift tolerance must never
+        // extend to Removed lines, since those are the actual change.
+        var source = new[] { "a", "x", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyHunkFuzzy(source, hunk));
+    }
 }

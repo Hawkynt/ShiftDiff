@@ -94,21 +94,38 @@ public static class PatchApplier
             return new PatchApplicationResult(insertion, PatchApplicationConfidence.Exact);
         }
 
-        var matchStartIndex = FindClosestMatch(sourceLines, oldLines, recordedStartIndex);
-        if (matchStartIndex is null)
+        var match = FindClosestMatch(sourceLines, oldLines, recordedStartIndex);
+        if (match is null)
         {
             throw new PatchApplicationException(
                 "Hunk context/removed content was not found anywhere in the source.");
         }
 
-        var confidence = matchStartIndex.Value == recordedStartIndex
+        var matchStartIndex = match.Value.Index;
+        var confidence = match.Value.Kind == MatchKind.Exact && matchStartIndex == recordedStartIndex
             ? PatchApplicationConfidence.Exact
             : PatchApplicationConfidence.High;
 
-        var result = new List<string>(sourceLines.Count - oldLines.Count + newLines.Count);
-        result.AddRange(sourceLines.Take(matchStartIndex.Value));
-        result.AddRange(newLines);
-        result.AddRange(sourceLines.Skip(matchStartIndex.Value + oldLines.Count));
+        // A leading/trailing Context line matched only via drift tolerance was
+        // never actually verified against the source at this position — the
+        // hunk's recorded content for that line is spliced through unchanged
+        // elsewhere, so here we must keep the source's real (unverified) line
+        // instead of overwriting it with the hunk's recorded Context content.
+        var linesToInsert = newLines;
+        if (match.Value.Kind == MatchKind.LeadingDrift)
+        {
+            linesToInsert = new List<string>(newLines) { [0] = sourceLines[matchStartIndex] };
+        }
+        else if (match.Value.Kind == MatchKind.TrailingDrift)
+        {
+            linesToInsert = new List<string>(newLines);
+            linesToInsert[^1] = sourceLines[matchStartIndex + oldLines.Count - 1];
+        }
+
+        var result = new List<string>(sourceLines.Count - oldLines.Count + linesToInsert.Count);
+        result.AddRange(sourceLines.Take(matchStartIndex));
+        result.AddRange(linesToInsert);
+        result.AddRange(sourceLines.Skip(matchStartIndex + oldLines.Count));
         return new PatchApplicationResult(result, confidence);
     }
 
@@ -129,7 +146,16 @@ public static class PatchApplier
         return new PatchApplicationResult(lines, confidence);
     }
 
-    private static int? FindClosestMatch(
+    private enum MatchKind
+    {
+        Exact,
+        LeadingDrift,
+        TrailingDrift,
+    }
+
+    private readonly record struct FuzzyMatch(int Index, MatchKind Kind);
+
+    private static FuzzyMatch? FindClosestMatch(
         IReadOnlyList<string> sourceLines, IReadOnlyList<UnifiedDiffLine> oldLines, int preferredIndex)
     {
         var lastPossibleStart = sourceLines.Count - oldLines.Count;
@@ -138,11 +164,15 @@ public static class PatchApplier
             return null;
         }
 
-        int? bestIndex = null;
+        var leadingContextRun = CountLeadingContextRun(oldLines);
+        var trailingContextRun = CountTrailingContextRun(oldLines);
+
+        FuzzyMatch? best = null;
         var bestDistance = int.MaxValue;
         for (var candidate = 0; candidate <= lastPossibleStart; candidate++)
         {
-            if (!MatchesAt(sourceLines, oldLines, candidate))
+            var kind = MatchAt(sourceLines, oldLines, candidate, leadingContextRun, trailingContextRun);
+            if (kind is null)
             {
                 continue;
             }
@@ -151,16 +181,69 @@ public static class PatchApplier
             if (distance < bestDistance)
             {
                 bestDistance = distance;
-                bestIndex = candidate;
+                best = new FuzzyMatch(candidate, kind.Value);
             }
         }
 
-        return bestIndex;
+        return best;
     }
 
-    private static bool MatchesAt(IReadOnlyList<string> sourceLines, IReadOnlyList<UnifiedDiffLine> oldLines, int start)
+    // Counts Context-kind lines before the first Removed-kind line — the
+    // leading edge fuzz tolerance may relax at most this many lines (fuzz
+    // level 1 here means at most the single outermost one).
+    private static int CountLeadingContextRun(IReadOnlyList<UnifiedDiffLine> oldLines)
     {
-        for (var i = 0; i < oldLines.Count; i++)
+        var count = 0;
+        while (count < oldLines.Count && oldLines[count].Kind == UnifiedDiffLineKind.Context)
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    // Counts Context-kind lines after the last Removed-kind line — the
+    // trailing counterpart of CountLeadingContextRun.
+    private static int CountTrailingContextRun(IReadOnlyList<UnifiedDiffLine> oldLines)
+    {
+        var count = 0;
+        while (count < oldLines.Count && oldLines[oldLines.Count - 1 - count].Kind == UnifiedDiffLineKind.Context)
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    private static MatchKind? MatchAt(
+        IReadOnlyList<string> sourceLines, IReadOnlyList<UnifiedDiffLine> oldLines, int start,
+        int leadingContextRun, int trailingContextRun)
+    {
+        if (MatchesAtRange(sourceLines, oldLines, start, 0, oldLines.Count))
+        {
+            return MatchKind.Exact;
+        }
+
+        // Fuzz level 1: relax at most the single outermost Context line on
+        // one edge at a time (never both edges together, never a Removed
+        // line — Removed lines are the actual change and must always match).
+        if (leadingContextRun > 0 && MatchesAtRange(sourceLines, oldLines, start, 1, oldLines.Count))
+        {
+            return MatchKind.LeadingDrift;
+        }
+
+        if (trailingContextRun > 0 && MatchesAtRange(sourceLines, oldLines, start, 0, oldLines.Count - 1))
+        {
+            return MatchKind.TrailingDrift;
+        }
+
+        return null;
+    }
+
+    private static bool MatchesAtRange(
+        IReadOnlyList<string> sourceLines, IReadOnlyList<UnifiedDiffLine> oldLines, int start, int fromInclusive, int toExclusive)
+    {
+        for (var i = fromInclusive; i < toExclusive; i++)
         {
             if (sourceLines[start + i] != oldLines[i].Content)
             {
