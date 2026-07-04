@@ -8,6 +8,9 @@ public static class BlockSimilarityScorer
     private const int FingerprintBits = 64;
     private const int ShingleSize = 3;
 
+    public static int TokenCount(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        TokenizeRange(oldLines, candidate.OldStart, candidate.OldEnd).Count;
+
     public static double ExactHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines)
     {
         var lineCount = candidate.OldEnd - candidate.OldStart + 1;

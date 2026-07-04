@@ -255,4 +255,64 @@ public class BlockClassifierTests
         var match = Assert.Single(result);
         Assert.Equal(ChangeType.Moved, match.MatchType);
     }
+
+    [Fact]
+    public void Classify_marks_a_candidate_as_uncertain_when_below_minimum_token_count()
+    {
+        var oldLines = new[]
+        {
+            "filler original line zero content aaa",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "filler new line zero content bbb",
+            "filler new line one content ccc",
+            "filler new line two content ddd",
+            "filler new line three content eee",
+            "filler new line four content fff",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 19);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Uncertain, match.MatchType);
+        Assert.Equal(0.875, match.Score);
+        Assert.Equal(Confidence.Certain, match.Confidence);
+    }
+
+    [Fact]
+    public void Classify_marks_a_candidate_as_moved_when_at_minimum_token_count_boundary()
+    {
+        var oldLines = new[]
+        {
+            "filler original line zero content aaa",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "filler new line zero content bbb",
+            "filler new line one content ccc",
+            "filler new line two content ddd",
+            "filler new line three content eee",
+            "filler new line four content fff",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 18);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Moved, match.MatchType);
+    }
 }
