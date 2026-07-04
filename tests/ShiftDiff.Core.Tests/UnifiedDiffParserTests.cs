@@ -57,16 +57,28 @@ public class UnifiedDiffParserTests
         var header = UnifiedDiffParser.ParseFileHeader("--- old.txt", "+++ new.txt");
         Assert.Equal("old.txt", header.SourcePath);
         Assert.Equal("new.txt", header.TargetPath);
+        Assert.Null(header.SourceRevision);
+        Assert.Null(header.TargetRevision);
     }
 
     [Fact]
-    public void TabSeparatedTimestampSuffix_IsStripped()
+    public void TabSeparatedTimestampSuffix_IsStrippedFromPathAndExposedAsRevision()
     {
         var header = UnifiedDiffParser.ParseFileHeader(
             "--- old.txt\t2024-01-01 00:00:00",
             "+++ new.txt\t2024-01-02 00:00:00");
         Assert.Equal("old.txt", header.SourcePath);
         Assert.Equal("new.txt", header.TargetPath);
+        Assert.Equal("2024-01-01 00:00:00", header.SourceRevision);
+        Assert.Equal("2024-01-02 00:00:00", header.TargetRevision);
+    }
+
+    [Fact]
+    public void OnlyOldLineHasRevisionSuffix_TargetRevisionIsNull()
+    {
+        var header = UnifiedDiffParser.ParseFileHeader("--- old.txt\trev1", "+++ new.txt");
+        Assert.Equal("rev1", header.SourceRevision);
+        Assert.Null(header.TargetRevision);
     }
 
     [Fact]

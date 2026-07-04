@@ -4,7 +4,11 @@ namespace ShiftDiff.Core;
 
 public sealed record UnifiedDiffHunkHeader(int OldStart, int OldCount, int NewStart, int NewCount);
 
-public sealed record UnifiedDiffFileHeader(string SourcePath, string TargetPath);
+public sealed record UnifiedDiffFileHeader(
+    string SourcePath,
+    string TargetPath,
+    string? SourceRevision = null,
+    string? TargetRevision = null);
 
 public enum UnifiedDiffLineKind { Context, Added, Removed }
 
@@ -34,16 +38,19 @@ public static class UnifiedDiffParser
             throw new FormatException("The new line is not a unified diff file header.");
         }
 
-        return new UnifiedDiffFileHeader(
-            ExtractPath(oldLine),
-            ExtractPath(newLine));
+        var (sourcePath, sourceRevision) = ExtractPathAndRevision(oldLine);
+        var (targetPath, targetRevision) = ExtractPathAndRevision(newLine);
+
+        return new UnifiedDiffFileHeader(sourcePath, targetPath, sourceRevision, targetRevision);
     }
 
-    private static string ExtractPath(string line)
+    private static (string Path, string? Revision) ExtractPathAndRevision(string line)
     {
-        var path = line[4..];
-        var tabIndex = path.IndexOf('\t');
-        return tabIndex >= 0 ? path[..tabIndex] : path;
+        var rest = line[4..];
+        var tabIndex = rest.IndexOf('\t');
+        return tabIndex >= 0
+            ? (rest[..tabIndex], rest[(tabIndex + 1)..])
+            : (rest, null);
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)
