@@ -395,4 +395,34 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseRenameCopyMetadata("rename from old.txt", "copy to new.txt"));
     }
+
+    [Fact]
+    public void IndexHashLineWithMode_ParsesHashesAndMode()
+    {
+        var indexHash = UnifiedDiffParser.ParseIndexHash("index a29bdeb..c0d0fb4 100644");
+        Assert.Equal("a29bdeb", indexHash.OldHash);
+        Assert.Equal("c0d0fb4", indexHash.NewHash);
+        Assert.Equal("100644", indexHash.Mode);
+    }
+
+    [Fact]
+    public void IndexHashLineWithoutMode_ParsesHashesWithNullMode()
+    {
+        var indexHash = UnifiedDiffParser.ParseIndexHash("index a29bdeb..c0d0fb4");
+        Assert.Equal("a29bdeb", indexHash.OldHash);
+        Assert.Equal("c0d0fb4", indexHash.NewHash);
+        Assert.Null(indexHash.Mode);
+    }
+
+    [Fact]
+    public void IndexHashLineWithoutPrefix_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseIndexHash("a29bdeb..c0d0fb4"));
+    }
+
+    [Fact]
+    public void IndexHashLineWithoutSeparator_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseIndexHash("index a29bdeb c0d0fb4"));
+    }
 }

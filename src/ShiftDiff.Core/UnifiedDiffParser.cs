@@ -34,6 +34,8 @@ public enum GitRenameCopyKind { Rename, Copy }
 
 public sealed record GitRenameCopyMetadata(GitRenameCopyKind Kind, string SourcePath, string TargetPath);
 
+public sealed record GitIndexHash(string OldHash, string NewHash, string? Mode);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -150,6 +152,28 @@ public static class UnifiedDiffParser
         }
 
         return new GitRenameCopyMetadata(kind, sourcePath, toLine[toPrefix.Length..]);
+    }
+
+    public static GitIndexHash ParseIndexHash(string line)
+    {
+        if (!line.StartsWith("index ", StringComparison.Ordinal))
+        {
+            throw new FormatException("The line is not a git index hash header.");
+        }
+
+        var rest = line[6..];
+        var dotDotIndex = rest.IndexOf("..", StringComparison.Ordinal);
+        if (dotDotIndex < 0)
+        {
+            throw new FormatException("The index hash line has no \"..\" separator.");
+        }
+
+        var oldHash = rest[..dotDotIndex];
+        var afterDots = rest[(dotDotIndex + 2)..];
+        var spaceIndex = afterDots.IndexOf(' ');
+        return spaceIndex >= 0
+            ? new GitIndexHash(oldHash, afterDots[..spaceIndex], afterDots[(spaceIndex + 1)..])
+            : new GitIndexHash(oldHash, afterDots, null);
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)
