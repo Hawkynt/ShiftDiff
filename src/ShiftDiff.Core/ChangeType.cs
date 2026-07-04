@@ -10,5 +10,6 @@ public enum ChangeType
     MovedEdited,
     Split,
     Merged,
-    Uncertain
+    Uncertain,
+    Conflict
 }
