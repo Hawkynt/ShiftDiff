@@ -31,11 +31,20 @@ public static class ThreeWayComparer
         var result = new List<ThreeWayChange>();
         void FlushInsertions(int anchorIndex)
         {
-            if (localInserts.TryGetValue(anchorIndex, out var localIns))
-                foreach (var c in localIns)
+            var hasLocal = localInserts.TryGetValue(anchorIndex, out var localIns);
+            var hasRemote = remoteInserts.TryGetValue(anchorIndex, out var remoteIns);
+            if (hasLocal && hasRemote && localIns!.Count == 1 && remoteIns!.Count == 1
+                && string.Equals(localIns[0].NewLine, remoteIns[0].NewLine, comparison))
+            {
+                result.Add(new ThreeWayChange(ChangeType.Added, ChangeSide.Both, null,
+                    localIns[0].NewLine, remoteIns[0].NewLine, null, localIns[0].NewIndex, remoteIns[0].NewIndex));
+                return;
+            }
+            if (hasLocal)
+                foreach (var c in localIns!)
                     result.Add(new ThreeWayChange(ChangeType.Added, ChangeSide.Local, null, c.NewLine, null, null, c.NewIndex, null));
-            if (remoteInserts.TryGetValue(anchorIndex, out var remoteIns))
-                foreach (var c in remoteIns)
+            if (hasRemote)
+                foreach (var c in remoteIns!)
                     result.Add(new ThreeWayChange(ChangeType.Added, ChangeSide.Remote, null, null, c.NewLine, null, null, c.NewIndex));
         }
 
