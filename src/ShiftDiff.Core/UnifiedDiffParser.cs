@@ -12,6 +12,8 @@ public sealed record UnifiedDiffLine(UnifiedDiffLineKind Kind, string Content);
 
 public sealed record UnifiedDiffHunk(UnifiedDiffHunkHeader Header, IReadOnlyList<UnifiedDiffLine> Lines);
 
+public sealed record UnifiedDiffFile(UnifiedDiffFileHeader Header, IReadOnlyList<UnifiedDiffHunk> Hunks);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -90,5 +92,38 @@ public static class UnifiedDiffParser
         var header = ParseHunkHeader(headerLine);
         var lines = bodyLines.Select(ParseLine).ToList();
         return new UnifiedDiffHunk(header, lines);
+    }
+
+    public static UnifiedDiffFile ParseFile(IReadOnlyList<string> lines)
+    {
+        if (lines.Count < 2)
+        {
+            throw new FormatException("A unified diff file needs at least two header lines.");
+        }
+
+        var header = ParseFileHeader(lines[0], lines[1]);
+
+        var hunks = new List<UnifiedDiffHunk>();
+        var index = 2;
+        while (index < lines.Count)
+        {
+            if (!lines[index].StartsWith("@@", StringComparison.Ordinal))
+            {
+                throw new FormatException("Expected a hunk header line.");
+            }
+
+            var headerLine = lines[index];
+            index++;
+
+            var bodyStart = index;
+            while (index < lines.Count && !lines[index].StartsWith("@@", StringComparison.Ordinal))
+            {
+                index++;
+            }
+
+            hunks.Add(ParseHunk(headerLine, lines.Skip(bodyStart).Take(index - bodyStart).ToList()));
+        }
+
+        return new UnifiedDiffFile(header, hunks);
     }
 }

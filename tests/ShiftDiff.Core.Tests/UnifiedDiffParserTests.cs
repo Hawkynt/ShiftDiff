@@ -177,4 +177,54 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseHunk("@@ -1,1 +1,1 @@", new[] { "@oops" }));
     }
+
+    [Fact]
+    public void SingleHunk_MatchesStandaloneParseHunkResult()
+    {
+        var lines = new[] { "--- old.txt", "+++ new.txt", "@@ -1,3 +1,3 @@", " a", " b", " c" };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        var expectedHunk = UnifiedDiffParser.ParseHunk("@@ -1,3 +1,3 @@", new[] { " a", " b", " c" });
+        Assert.Single(file.Hunks);
+        Assert.Equal(expectedHunk.Header, file.Hunks[0].Header);
+        Assert.Equal(expectedHunk.Lines, file.Hunks[0].Lines);
+    }
+
+    [Fact]
+    public void MultipleHunks_ParsedInOrderWithCorrectContent()
+    {
+        var lines = new[]
+        {
+            "--- old.txt", "+++ new.txt",
+            "@@ -1,2 +1,2 @@", " a", "-b",
+            "@@ -10,2 +10,2 @@", " x", "+y",
+        };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.Equal(2, file.Hunks.Count);
+        Assert.Equal(1, file.Hunks[0].Header.OldStart);
+        Assert.Equal(2, file.Hunks[0].Lines.Count);
+        Assert.Equal(10, file.Hunks[1].Header.OldStart);
+        Assert.Equal(2, file.Hunks[1].Lines.Count);
+    }
+
+    [Fact]
+    public void HeaderOnly_NoHunks_ParsesEmptyHunksList()
+    {
+        var lines = new[] { "--- old.txt", "+++ new.txt" };
+        var file = UnifiedDiffParser.ParseFile(lines);
+        Assert.Empty(file.Hunks);
+    }
+
+    [Fact]
+    public void ContentAfterHeaderIsNotAHunkHeader_ThrowsFormatException()
+    {
+        var lines = new[] { "--- old.txt", "+++ new.txt", " not a hunk header" };
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFile(lines));
+    }
+
+    [Fact]
+    public void MalformedFileHeader_PropagatesFormatException()
+    {
+        var lines = new[] { "old.txt", "+++ new.txt", "@@ -1,1 +1,1 @@", " a" };
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseFile(lines));
+    }
 }
