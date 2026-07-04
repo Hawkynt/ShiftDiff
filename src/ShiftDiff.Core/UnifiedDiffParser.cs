@@ -30,6 +30,10 @@ public enum GitSimilarityKind { Similarity, Dissimilarity }
 
 public sealed record GitSimilarityIndex(GitSimilarityKind Kind, int Percentage);
 
+public enum GitRenameCopyKind { Rename, Copy }
+
+public sealed record GitRenameCopyMetadata(GitRenameCopyKind Kind, string SourcePath, string TargetPath);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -118,6 +122,34 @@ public static class UnifiedDiffParser
         }
 
         return new GitSimilarityIndex(kind, int.Parse(remainder[..^1]));
+    }
+
+    public static GitRenameCopyMetadata ParseRenameCopyMetadata(string fromLine, string toLine)
+    {
+        GitRenameCopyKind kind;
+        string sourcePath;
+        if (fromLine.StartsWith("rename from ", StringComparison.Ordinal))
+        {
+            kind = GitRenameCopyKind.Rename;
+            sourcePath = fromLine[12..];
+        }
+        else if (fromLine.StartsWith("copy from ", StringComparison.Ordinal))
+        {
+            kind = GitRenameCopyKind.Copy;
+            sourcePath = fromLine[10..];
+        }
+        else
+        {
+            throw new FormatException("The from line is not a git rename or copy header.");
+        }
+
+        var toPrefix = kind == GitRenameCopyKind.Rename ? "rename to " : "copy to ";
+        if (!toLine.StartsWith(toPrefix, StringComparison.Ordinal))
+        {
+            throw new FormatException("The to line does not match the from line's rename/copy kind.");
+        }
+
+        return new GitRenameCopyMetadata(kind, sourcePath, toLine[toPrefix.Length..]);
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)

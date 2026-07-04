@@ -365,4 +365,34 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseSimilarityIndex("100%"));
     }
+
+    [Fact]
+    public void RenamePair_ParsesRenameKindAndPaths()
+    {
+        var metadata = UnifiedDiffParser.ParseRenameCopyMetadata("rename from old.txt", "rename to new.txt");
+        Assert.Equal(GitRenameCopyKind.Rename, metadata.Kind);
+        Assert.Equal("old.txt", metadata.SourcePath);
+        Assert.Equal("new.txt", metadata.TargetPath);
+    }
+
+    [Fact]
+    public void CopyPair_ParsesCopyKindAndPaths()
+    {
+        var metadata = UnifiedDiffParser.ParseRenameCopyMetadata("copy from old.txt", "copy to new.txt");
+        Assert.Equal(GitRenameCopyKind.Copy, metadata.Kind);
+        Assert.Equal("old.txt", metadata.SourcePath);
+        Assert.Equal("new.txt", metadata.TargetPath);
+    }
+
+    [Fact]
+    public void MalformedFromLine_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseRenameCopyMetadata("old.txt", "rename to new.txt"));
+    }
+
+    [Fact]
+    public void MismatchedKindBetweenFromAndToLines_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseRenameCopyMetadata("rename from old.txt", "copy to new.txt"));
+    }
 }
