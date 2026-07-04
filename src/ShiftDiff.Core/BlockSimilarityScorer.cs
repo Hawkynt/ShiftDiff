@@ -20,4 +20,23 @@ public static class BlockSimilarityScorer
 
         return matchingLines / (double)lineCount;
     }
+
+    public static double NormalizedHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    {
+        var lineCount = candidate.OldEnd - candidate.OldStart + 1;
+        var matchingLines = 0;
+
+        for (var offset = 0; offset < lineCount; offset++)
+        {
+            var oldHash = LineHasher.Hash(oldLines[candidate.OldStart + offset]).WhitespaceNormalized;
+            var newHash = LineHasher.Hash(newLines[candidate.NewStart + offset]).WhitespaceNormalized;
+
+            if (oldHash == newHash)
+            {
+                matchingLines++;
+            }
+        }
+
+        return matchingLines / (double)lineCount;
+    }
 }

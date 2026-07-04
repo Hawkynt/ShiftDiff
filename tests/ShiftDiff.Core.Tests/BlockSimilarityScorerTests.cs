@@ -100,4 +100,74 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(1.0, result);
     }
+
+    [Fact]
+    public void NormalizedHashOverlap_ignores_internal_whitespace_differences_that_ExactHashOverlap_would_count_as_a_mismatch()
+    {
+        var oldLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line   Beta    long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+
+        var normalized = BlockSimilarityScorer.NormalizedHashOverlap(candidate, oldLines, newLines);
+        var exact = BlockSimilarityScorer.ExactHashOverlap(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, normalized);
+        Assert.Equal(2.0 / 3.0, exact);
+    }
+
+    [Fact]
+    public void NormalizedHashOverlap_still_counts_a_mismatch_when_line_content_actually_differs()
+    {
+        var oldLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "block line Alpha long enough content",
+            "changed block line Beta content",
+            "block line Gamma long enough content",
+        };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+
+        var result = BlockSimilarityScorer.NormalizedHashOverlap(candidate, oldLines, newLines);
+
+        Assert.Equal(2.0 / 3.0, result);
+    }
+
+    [Fact]
+    public void NormalizedHashOverlap_returns_one_for_fully_identical_lines_within_bounds()
+    {
+        var oldLines = new[]
+        {
+            "old prefix line differs outside range",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "old suffix line differs outside range",
+        };
+        var newLines = new[]
+        {
+            "new prefix line differs outside range",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "new suffix line differs outside range",
+        };
+        var candidate = new BlockCandidate(1, 2, 1, 2);
+
+        var result = BlockSimilarityScorer.NormalizedHashOverlap(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
 }
