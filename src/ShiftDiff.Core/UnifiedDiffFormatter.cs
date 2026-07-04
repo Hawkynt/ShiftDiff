@@ -15,17 +15,52 @@ public static class UnifiedDiffFormatter
         // mirrors UnifiedDiffParser.ParseFile's own fallback for that shape.
         if (file.GitHeader is null || file.Hunks.Count > 0)
         {
-            lines.Add(FormatFileHeaderLine("---", file.Header.SourcePath, file.Header.SourceRevision));
-            lines.Add(FormatFileHeaderLine("+++", file.Header.TargetPath, file.Header.TargetRevision));
+            lines.AddRange(FormatBody(file.Header, file.Hunks));
         }
 
-        foreach (var hunk in file.Hunks)
+        return lines;
+    }
+
+    private static IEnumerable<string> FormatBody(UnifiedDiffFileHeader header, IReadOnlyList<UnifiedDiffHunk> hunks)
+    {
+        yield return FormatFileHeaderLine("---", header.SourcePath, header.SourceRevision);
+        yield return FormatFileHeaderLine("+++", header.TargetPath, header.TargetRevision);
+
+        foreach (var hunk in hunks)
         {
-            lines.Add(FormatHunkHeader(hunk.Header));
+            yield return FormatHunkHeader(hunk.Header);
             foreach (var line in hunk.Lines)
             {
-                lines.Add(FormatLine(line));
+                yield return FormatLine(line);
             }
+        }
+    }
+
+    private const int SvnSeparatorLength = 67;
+
+    public static IReadOnlyList<string> FormatSvn(UnifiedDiffFile file)
+    {
+        if (file.GitHeader is not null)
+        {
+            throw new NotSupportedException("SVN-style export does not support git extended headers.");
+        }
+
+        var lines = new List<string>
+        {
+            $"Index: {file.Header.SourcePath}",
+            new string('=', SvnSeparatorLength),
+        };
+        lines.AddRange(FormatBody(file.Header, file.Hunks));
+
+        return lines;
+    }
+
+    public static IReadOnlyList<string> FormatSvn(UnifiedDiffPatch patch)
+    {
+        var lines = new List<string>();
+        foreach (var file in patch.Files)
+        {
+            lines.AddRange(FormatSvn(file));
         }
 
         return lines;

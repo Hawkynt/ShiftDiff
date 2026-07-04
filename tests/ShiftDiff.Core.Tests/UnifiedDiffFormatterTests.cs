@@ -318,6 +318,78 @@ public class UnifiedDiffFormatterTests
             lines);
     }
 
+    [Fact]
+    public void SvnFileWithRevisions_FormatsIndexHeaderSeparatorAndBody()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("old.txt", "old.txt", "(revision 5)", "(working copy)"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new[] { new UnifiedDiffLine(UnifiedDiffLineKind.Context, "a") }),
+            });
+
+        var lines = UnifiedDiffFormatter.FormatSvn(file);
+
+        Assert.Equal(
+            new[]
+            {
+                "Index: old.txt",
+                new string('=', 67),
+                "--- old.txt\t(revision 5)",
+                "+++ old.txt\t(working copy)",
+                "@@ -1,1 +1,1 @@", " a",
+            },
+            lines);
+    }
+
+    [Fact]
+    public void SvnFileWithoutRevision_FormatsDashPairWithNoTrailingTab()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("old.txt", "old.txt"),
+            Array.Empty<UnifiedDiffHunk>());
+
+        var lines = UnifiedDiffFormatter.FormatSvn(file);
+
+        Assert.Equal(
+            new[] { "Index: old.txt", new string('=', 67), "--- old.txt", "+++ old.txt" },
+            lines);
+    }
+
+    [Fact]
+    public void SvnFileWithGitHeader_ThrowsNotSupportedException()
+    {
+        var file = GitOnlyFile(indexHash: new GitIndexHash("abc123", "def456", null));
+
+        Assert.Throws<NotSupportedException>(() => UnifiedDiffFormatter.FormatSvn(file));
+    }
+
+    [Fact]
+    public void SvnPatch_MultipleFiles_FormatsEachFileBackToBack()
+    {
+        var patch = new UnifiedDiffPatch(new[]
+        {
+            new UnifiedDiffFile(
+                new UnifiedDiffFileHeader("old1.txt", "old1.txt"),
+                Array.Empty<UnifiedDiffHunk>()),
+            new UnifiedDiffFile(
+                new UnifiedDiffFileHeader("old2.txt", "old2.txt"),
+                Array.Empty<UnifiedDiffHunk>()),
+        });
+
+        var lines = UnifiedDiffFormatter.FormatSvn(patch);
+
+        Assert.Equal(
+            new[]
+            {
+                "Index: old1.txt", new string('=', 67), "--- old1.txt", "+++ old1.txt",
+                "Index: old2.txt", new string('=', 67), "--- old2.txt", "+++ old2.txt",
+            },
+            lines);
+    }
+
     private static UnifiedDiffFile GitOnlyFile(
         GitFileModeChange? modeChange = null,
         GitFileCreationMode? creationMode = null,
