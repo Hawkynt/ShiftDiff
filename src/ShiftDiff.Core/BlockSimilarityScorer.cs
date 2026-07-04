@@ -216,6 +216,16 @@ public static class BlockSimilarityScorer
         return matchingCount / (double)comparableCount;
     }
 
+    public static double CombinedScore(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        (ExactHashOverlap(candidate, oldLines, newLines)
+         + NormalizedHashOverlap(candidate, oldLines, newLines)
+         + TokenShingleSimilarity(candidate, oldLines, newLines)
+         + SimHashSimilarity(candidate, oldLines, newLines)
+         + BlockSizeRatio(candidate, oldLines, newLines)
+         + OrderingConsistency(candidate, oldLines, newLines)
+         + RarityWeightedAnchorScore(candidate, oldLines, newLines)
+         + NeighboringBlockConsistency(candidate, oldLines, newLines)) / 8.0;
+
     private static List<string> Tokenize(string line)
     {
         var tokens = new List<string>();
