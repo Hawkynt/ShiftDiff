@@ -6,7 +6,8 @@ public sealed record FolderEntryChange(
     string RelativePath,
     FolderChangeType ChangeType,
     string? MovedFrom = null,
-    long? Size = null);
+    long? Size = null,
+    string? CopiedFrom = null);
 
 public static class FolderComparer
 {
