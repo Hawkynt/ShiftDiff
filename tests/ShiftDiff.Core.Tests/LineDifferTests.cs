@@ -227,4 +227,83 @@ public class LineDifferTests
         Assert.Equal(ChangeType.Unchanged, result[2].ChangeType);
         Assert.Equal(ChangeType.Unchanged, result[3].ChangeType);
     }
+
+    [Fact]
+    public void Diff_treats_leading_trailing_whitespace_difference_as_edited_by_default()
+    {
+        var oldLines = new[] { "a" };
+        var newLines = new[] { "  a  " };
+
+        var result = LineDiffer.Diff(oldLines, newLines);
+
+        Assert.Equal(ChangeType.Edited, result[0].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_treats_leading_trailing_whitespace_difference_as_unchanged_with_Trim_mode()
+    {
+        var oldLines = new[] { "a" };
+        var newLines = new[] { "  a  " };
+
+        var result = LineDiffer.Diff(oldLines, newLines, whitespaceMode: WhitespaceMode.Trim);
+
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_treats_internal_whitespace_run_difference_as_unchanged_with_Normalize_mode()
+    {
+        var oldLines = new[] { "a  b" };
+        var newLines = new[] { "a b" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, whitespaceMode: WhitespaceMode.Normalize);
+
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_treats_internal_whitespace_run_difference_as_edited_with_bare_Trim_mode()
+    {
+        var oldLines = new[] { "a  b" };
+        var newLines = new[] { "a b" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, whitespaceMode: WhitespaceMode.Trim);
+
+        Assert.Equal(ChangeType.Edited, result[0].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_treats_all_whitespace_difference_as_unchanged_with_RemoveAll_mode()
+    {
+        var oldLines = new[] { "a b c" };
+        var newLines = new[] { "abc" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, whitespaceMode: WhitespaceMode.RemoveAll);
+
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+    }
+
+    [Fact]
+    public void Diff_preserves_original_content_when_whitespace_normalized_match_is_unchanged()
+    {
+        var oldLines = new[] { "a  b" };
+        var newLines = new[] { "a b" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, whitespaceMode: WhitespaceMode.Normalize);
+
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+        Assert.Equal("a  b", result[0].OldLine);
+        Assert.Equal("a b", result[0].NewLine);
+    }
+
+    [Fact]
+    public void Diff_composes_ignoreCase_and_whitespaceMode_together()
+    {
+        var oldLines = new[] { "A b" };
+        var newLines = new[] { "a  B" };
+
+        var result = LineDiffer.Diff(oldLines, newLines, ignoreCase: true, whitespaceMode: WhitespaceMode.Normalize);
+
+        Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
+    }
 }

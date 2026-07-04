@@ -6,23 +6,37 @@ public static class LineDiffer
     // oldLines[i..] and newLines[j..]. Backtracking forward from (0, 0) and
     // preferring the branch with the longer remaining LCS yields the usual
     // "diff" output (minimal Added/Removed set around a common subsequence).
-    public static LineChange[] Diff(string[] oldLines, string[] newLines, bool ignoreCase = false)
+    public static LineChange[] Diff(string[] oldLines, string[] newLines, bool ignoreCase = false, WhitespaceMode whitespaceMode = WhitespaceMode.None)
     {
         var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var dp = BuildLcsLengthTable(oldLines, newLines, comparison);
-        var rawChanges = Backtrack(oldLines, newLines, dp, comparison);
+        // Precomputed once per side (not per dp-cell) since BuildLcsLengthTable/Backtrack's
+        // inner loop is O(n·m) — recomputing the transform per cell would be wasteful.
+        var oldKeys = oldLines.Select(line => NormalizeForComparison(line, whitespaceMode)).ToArray();
+        var newKeys = newLines.Select(line => NormalizeForComparison(line, whitespaceMode)).ToArray();
+        var dp = BuildLcsLengthTable(oldKeys, newKeys, comparison);
+        var rawChanges = Backtrack(oldLines, newLines, oldKeys, newKeys, dp, comparison);
         return CoalesceAdjacentRemovedAndAddedIntoEdited(rawChanges);
     }
 
-    private static int[,] BuildLcsLengthTable(string[] oldLines, string[] newLines, StringComparison comparison)
+    private static string NormalizeForComparison(string line, WhitespaceMode whitespaceMode) => whitespaceMode switch
     {
-        var dp = new int[oldLines.Length + 1, newLines.Length + 1];
+        WhitespaceMode.Trim => LineNormalizer.Trim(line),
+        // Mirrors LineHasher's WhitespaceNormalized tier: trim first, then collapse internal runs.
+        WhitespaceMode.Normalize => LineNormalizer.NormalizeWhitespace(LineNormalizer.Trim(line)),
+        // Mirrors LineHasher's TokenNormalized tier: removing all whitespace makes trimming moot.
+        WhitespaceMode.RemoveAll => LineNormalizer.RemoveWhitespace(line),
+        _ => line,
+    };
 
-        for (var i = oldLines.Length - 1; i >= 0; i--)
+    private static int[,] BuildLcsLengthTable(string[] oldKeys, string[] newKeys, StringComparison comparison)
+    {
+        var dp = new int[oldKeys.Length + 1, newKeys.Length + 1];
+
+        for (var i = oldKeys.Length - 1; i >= 0; i--)
         {
-            for (var j = newLines.Length - 1; j >= 0; j--)
+            for (var j = newKeys.Length - 1; j >= 0; j--)
             {
-                dp[i, j] = string.Equals(oldLines[i], newLines[j], comparison)
+                dp[i, j] = string.Equals(oldKeys[i], newKeys[j], comparison)
                     ? dp[i + 1, j + 1] + 1
                     : Math.Max(dp[i + 1, j], dp[i, j + 1]);
             }
@@ -31,7 +45,7 @@ public static class LineDiffer
         return dp;
     }
 
-    private static List<LineChange> Backtrack(string[] oldLines, string[] newLines, int[,] dp, StringComparison comparison)
+    private static List<LineChange> Backtrack(string[] oldLines, string[] newLines, string[] oldKeys, string[] newKeys, int[,] dp, StringComparison comparison)
     {
         var result = new List<LineChange>();
         var i = 0;
@@ -39,7 +53,7 @@ public static class LineDiffer
 
         while (i < oldLines.Length && j < newLines.Length)
         {
-            if (string.Equals(oldLines[i], newLines[j], comparison))
+            if (string.Equals(oldKeys[i], newKeys[j], comparison))
             {
                 result.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[j], OldIndex: i, NewIndex: j));
                 i++;
