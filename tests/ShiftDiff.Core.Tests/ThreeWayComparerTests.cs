@@ -118,4 +118,22 @@ public class ThreeWayComparerTests
         Assert.Equal(ChangeType.Removed, change.ChangeType);
         Assert.Equal(ChangeSide.Both, change.Side);
     }
+
+    [Fact]
+    public void Compare_LocalOnlyInsertion_EmitsAddedEntryWithNullBaseIndex()
+    {
+        var baseLines = new[] { "a", "b", "c" };
+        var localLines = new[] { "a", "X", "b", "c" };
+        var remoteLines = new[] { "a", "b", "c" };
+
+        var result = ThreeWayComparer.Compare(baseLines, localLines, remoteLines);
+
+        Assert.Equal(baseLines.Length + 1, result.Length);
+        var insertion = Assert.Single(result, c => c.ChangeType == ChangeType.Added);
+        Assert.Equal(ChangeSide.Local, insertion.Side);
+        Assert.Null(insertion.BaseIndex);
+        Assert.Null(insertion.BaseLine);
+        Assert.Equal("X", insertion.LocalLine);
+        Assert.Null(insertion.RemoteLine);
+    }
 }
