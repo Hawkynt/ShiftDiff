@@ -74,4 +74,48 @@ public class ThreeWayComparerTests
         Assert.Equal(ChangeType.Conflict, change.ChangeType);
         Assert.Equal(ChangeSide.Both, change.Side);
     }
+
+    [Fact]
+    public void Compare_LocalOnlyDeletion_MarksRemovedSideLocal()
+    {
+        var baseLines = new[] { "a", "b", "c" };
+        var localLines = new[] { "a", "c" };
+        var remoteLines = new[] { "a", "b", "c" };
+
+        var result = ThreeWayComparer.Compare(baseLines, localLines, remoteLines);
+
+        var change = Assert.Single(result, c => c.BaseIndex == 1);
+        Assert.Equal(ChangeType.Removed, change.ChangeType);
+        Assert.Equal(ChangeSide.Local, change.Side);
+        Assert.Null(change.LocalLine);
+    }
+
+    [Fact]
+    public void Compare_RemoteOnlyDeletion_MarksRemovedSideRemote()
+    {
+        var baseLines = new[] { "a", "b", "c" };
+        var localLines = new[] { "a", "b", "c" };
+        var remoteLines = new[] { "a", "c" };
+
+        var result = ThreeWayComparer.Compare(baseLines, localLines, remoteLines);
+
+        var change = Assert.Single(result, c => c.BaseIndex == 1);
+        Assert.Equal(ChangeType.Removed, change.ChangeType);
+        Assert.Equal(ChangeSide.Remote, change.Side);
+        Assert.Null(change.RemoteLine);
+    }
+
+    [Fact]
+    public void Compare_BothSidesDeleteSameLine_MarksRemovedSideBoth()
+    {
+        var baseLines = new[] { "a", "b", "c" };
+        var localLines = new[] { "a", "c" };
+        var remoteLines = new[] { "a", "c" };
+
+        var result = ThreeWayComparer.Compare(baseLines, localLines, remoteLines);
+
+        var change = Assert.Single(result, c => c.BaseIndex == 1);
+        Assert.Equal(ChangeType.Removed, change.ChangeType);
+        Assert.Equal(ChangeSide.Both, change.Side);
+    }
 }

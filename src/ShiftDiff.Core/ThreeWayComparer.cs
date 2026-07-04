@@ -34,10 +34,10 @@ public static class ThreeWayComparer
             var (type, side) = (localChanged, remoteChanged) switch
             {
                 (false, false) => (ChangeType.Unchanged, ChangeSide.None),
-                (true, false) => (ChangeType.Edited, ChangeSide.Local),
-                (false, true) => (ChangeType.Edited, ChangeSide.Remote),
+                (true, false) => (local.ChangeType, ChangeSide.Local),
+                (false, true) => (remote.ChangeType, ChangeSide.Remote),
                 (true, true) when string.Equals(local.NewLine, remote.NewLine, comparison)
-                    => (ChangeType.Edited, ChangeSide.Both),
+                    => (local.ChangeType, ChangeSide.Both),
                 _ => (ChangeType.Conflict, ChangeSide.Both),
             };
 
