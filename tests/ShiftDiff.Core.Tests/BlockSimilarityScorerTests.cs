@@ -528,4 +528,64 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(0.5, result);
     }
+
+    [Fact]
+    public void NeighboringBlockConsistency_returns_one_when_both_neighbors_match()
+    {
+        var oldLines = new[] { "before line", "A", "B", "after line" };
+        var newLines = new[] { "before line", "A", "B", "after line" };
+        var candidate = new BlockCandidate(1, 2, 1, 2);
+
+        var result = BlockSimilarityScorer.NeighboringBlockConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void NeighboringBlockConsistency_returns_zero_when_both_neighbors_differ()
+    {
+        var oldLines = new[] { "old before", "A", "B", "old after" };
+        var newLines = new[] { "new before", "A", "B", "new after" };
+        var candidate = new BlockCandidate(1, 2, 1, 2);
+
+        var result = BlockSimilarityScorer.NeighboringBlockConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void NeighboringBlockConsistency_excludes_a_missing_neighbor_instead_of_penalizing_it()
+    {
+        var oldLines = new[] { "A", "B", "after line" };
+        var newLines = new[] { "A", "B", "after line" };
+        var candidate = new BlockCandidate(0, 1, 0, 1);
+
+        var result = BlockSimilarityScorer.NeighboringBlockConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void NeighboringBlockConsistency_averages_a_mixed_before_after_match()
+    {
+        var oldLines = new[] { "match before", "A", "B", "mismatch after old" };
+        var newLines = new[] { "match before", "A", "B", "mismatch after new" };
+        var candidate = new BlockCandidate(1, 2, 1, 2);
+
+        var result = BlockSimilarityScorer.NeighboringBlockConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(0.5, result);
+    }
+
+    [Fact]
+    public void NeighboringBlockConsistency_returns_one_when_candidate_spans_the_whole_file()
+    {
+        var oldLines = new[] { "A", "B" };
+        var newLines = new[] { "A", "B" };
+        var candidate = new BlockCandidate(0, 1, 0, 1);
+
+        var result = BlockSimilarityScorer.NeighboringBlockConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
 }

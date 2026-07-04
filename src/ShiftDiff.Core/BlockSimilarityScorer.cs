@@ -179,6 +179,43 @@ public static class BlockSimilarityScorer
         return strongCount / (double)count;
     }
 
+    public static double NeighboringBlockConsistency(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    {
+        var comparableCount = 0;
+        var matchingCount = 0;
+
+        if (candidate.OldStart > 0 && candidate.NewStart > 0)
+        {
+            comparableCount++;
+            var oldHash = LineHasher.Hash(oldLines[candidate.OldStart - 1]).WhitespaceNormalized;
+            var newHash = LineHasher.Hash(newLines[candidate.NewStart - 1]).WhitespaceNormalized;
+
+            if (oldHash == newHash)
+            {
+                matchingCount++;
+            }
+        }
+
+        if (candidate.OldEnd < oldLines.Length - 1 && candidate.NewEnd < newLines.Length - 1)
+        {
+            comparableCount++;
+            var oldHash = LineHasher.Hash(oldLines[candidate.OldEnd + 1]).WhitespaceNormalized;
+            var newHash = LineHasher.Hash(newLines[candidate.NewEnd + 1]).WhitespaceNormalized;
+
+            if (oldHash == newHash)
+            {
+                matchingCount++;
+            }
+        }
+
+        if (comparableCount == 0)
+        {
+            return 1.0;
+        }
+
+        return matchingCount / (double)comparableCount;
+    }
+
     private static List<string> Tokenize(string line)
     {
         var tokens = new List<string>();
