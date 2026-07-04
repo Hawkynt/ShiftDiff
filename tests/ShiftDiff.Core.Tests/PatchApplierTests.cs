@@ -200,6 +200,92 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void ApplyPatchExact_MultipleFiles_EachRoutedToItsOwnSourceByPath()
+    {
+        var fileA = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/first.txt", "b/first.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "a"),
+                        new(UnifiedDiffLineKind.Added, "A"),
+                    }),
+            });
+        var fileB = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/second.txt", "b/second.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "x"),
+                        new(UnifiedDiffLineKind.Added, "X"),
+                    }),
+            });
+        var patch = new UnifiedDiffPatch(new[] { fileA, fileB });
+        var sources = new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["a/first.txt"] = new[] { "a", "b" },
+            ["a/second.txt"] = new[] { "x", "y" },
+        };
+
+        var result = PatchApplier.ApplyPatchExact(patch, sources);
+
+        Assert.Equal(new[] { "A", "b" }, result["b/first.txt"]);
+        Assert.Equal(new[] { "X", "y" }, result["b/second.txt"]);
+    }
+
+    [Fact]
+    public void ApplyPatchExact_RenamedFile_OutputKeyedByTargetPathNotSourcePath()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/old-name.txt", "b/new-name.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Context, "unchanged"),
+                    }),
+            });
+        var patch = new UnifiedDiffPatch(new[] { file });
+        var sources = new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["a/old-name.txt"] = new[] { "unchanged" },
+        };
+
+        var result = PatchApplier.ApplyPatchExact(patch, sources);
+
+        Assert.True(result.ContainsKey("b/new-name.txt"));
+        Assert.False(result.ContainsKey("a/old-name.txt"));
+    }
+
+    [Fact]
+    public void ApplyPatchExact_MissingSourceForAFile_ThrowsPatchApplicationException()
+    {
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/missing.txt", "b/missing.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Context, "line"),
+                    }),
+            });
+        var patch = new UnifiedDiffPatch(new[] { file });
+        var sources = new Dictionary<string, IReadOnlyList<string>>();
+
+        Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyPatchExact(patch, sources));
+    }
+
+    [Fact]
     public void Fuzzy_MultiHunkFile_OneHunkShiftedAndOneExact_FileConfidenceIsHighOverall()
     {
         // First hunk's context ("a") only occurs at its recorded exact

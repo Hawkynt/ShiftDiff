@@ -56,6 +56,24 @@ public static class PatchApplier
         return result;
     }
 
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> ApplyPatchExact(
+        UnifiedDiffPatch patch, IReadOnlyDictionary<string, IReadOnlyList<string>> sourcesBySourcePath)
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>();
+        foreach (var file in patch.Files)
+        {
+            var sourcePath = file.Header.SourcePath;
+            if (!sourcesBySourcePath.TryGetValue(sourcePath, out var sourceLines))
+            {
+                throw new PatchApplicationException($"No source provided for path '{sourcePath}'.");
+            }
+
+            result[file.Header.TargetPath] = ApplyFileExact(sourceLines, file);
+        }
+
+        return result;
+    }
+
     public static PatchApplicationResult ApplyHunkFuzzy(IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk)
     {
         var oldLines = hunk.Lines
