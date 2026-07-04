@@ -9,7 +9,8 @@ public static class BlockClassifier
         DetectionMode mode = DetectionMode.Balanced,
         int minBlockSize = 1,
         int minTokenCount = 0,
-        int maxDuplicateAnchorFrequency = int.MaxValue)
+        int maxDuplicateAnchorFrequency = int.MaxValue,
+        double? pureMoveThreshold = null)
     {
         var matches = new BlockMatch[candidates.Length];
         var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
@@ -27,8 +28,9 @@ public static class BlockClassifier
                 if (count > maxDuplicateCount) maxDuplicateCount = count;
             }
 
-            var matchType = score >= threshold && blockSize >= minBlockSize && tokenCount >= minTokenCount && maxDuplicateCount <= maxDuplicateAnchorFrequency
-                ? ChangeType.Moved
+            var passesFilters = score >= threshold && blockSize >= minBlockSize && tokenCount >= minTokenCount && maxDuplicateCount <= maxDuplicateAnchorFrequency;
+            var matchType = passesFilters
+                ? (pureMoveThreshold is null || score >= pureMoveThreshold.Value ? ChangeType.Moved : ChangeType.MovedEdited)
                 : ChangeType.Uncertain;
             // Confidence is score-derived only (FR-015), independent of the FR-016 mode
             // threshold — a block can be Uncertain under a strict mode yet still Certain.

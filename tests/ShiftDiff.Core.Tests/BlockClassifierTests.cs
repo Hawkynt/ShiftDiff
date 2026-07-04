@@ -380,4 +380,86 @@ public class BlockClassifierTests
         var match = Assert.Single(result);
         Assert.Equal(ChangeType.Moved, match.MatchType);
     }
+
+    [Fact]
+    public void Classify_marks_a_candidate_as_moved_edited_when_score_is_below_pure_move_threshold()
+    {
+        var oldLines = new[]
+        {
+            "filler original line zero content aaa",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "filler new line zero content bbb",
+            "filler new line one content ccc",
+            "filler new line two content ddd",
+            "filler new line three content eee",
+            "filler new line four content fff",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines, pureMoveThreshold: 0.90);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.MovedEdited, match.MatchType);
+        Assert.Equal(0.875, match.Score);
+    }
+
+    [Fact]
+    public void Classify_marks_a_candidate_as_moved_when_no_pure_move_threshold_is_supplied()
+    {
+        var oldLines = new[]
+        {
+            "filler original line zero content aaa",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "filler new line zero content bbb",
+            "filler new line one content ccc",
+            "filler new line two content ddd",
+            "filler new line three content eee",
+            "filler new line four content fff",
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Moved, match.MatchType);
+    }
+
+    [Fact]
+    public void Classify_marks_a_candidate_as_moved_when_score_is_at_or_above_pure_move_threshold()
+    {
+        var oldLines = new[]
+        {
+            "block line Alpha long enough content here",
+            "block line Beta long enough content here",
+            "block line Gamma long enough content here",
+        };
+        var newLines = new[]
+        {
+            "block line Alpha long enough content here",
+            "block line Beta long enough content here",
+            "block line Gamma long enough content here",
+        };
+        var candidates = new[] { new BlockCandidate(0, 2, 0, 2) };
+
+        var result = BlockClassifier.Classify(candidates, oldLines, newLines, pureMoveThreshold: 0.90);
+
+        var match = Assert.Single(result);
+        Assert.Equal(ChangeType.Moved, match.MatchType);
+    }
 }
