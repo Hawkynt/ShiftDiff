@@ -5,5 +5,6 @@ public enum ChangeType
     Unchanged,
     Edited,
     Added,
-    Removed
+    Removed,
+    Moved
 }
