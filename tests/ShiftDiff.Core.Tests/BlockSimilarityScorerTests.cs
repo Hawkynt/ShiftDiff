@@ -408,4 +408,64 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(1.0, result);
     }
+
+    [Fact]
+    public void OrderingConsistency_returns_one_for_same_relative_order()
+    {
+        var oldLines = new[] { "alpha", "beta", "gamma" };
+        var newLines = new[] { "alpha", "beta", "gamma" };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+
+        var result = BlockSimilarityScorer.OrderingConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void OrderingConsistency_returns_zero_for_fully_reversed_order()
+    {
+        var oldLines = new[] { "alpha", "beta", "gamma" };
+        var newLines = new[] { "gamma", "beta", "alpha" };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+
+        var result = BlockSimilarityScorer.OrderingConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(0.0, result);
+    }
+
+    [Fact]
+    public void OrderingConsistency_returns_exact_fraction_for_partial_reorder()
+    {
+        var oldLines = new[] { "alpha", "beta", "gamma", "delta" };
+        var newLines = new[] { "alpha", "gamma", "beta", "delta" };
+        var candidate = new BlockCandidate(0, 3, 0, 3);
+
+        var result = BlockSimilarityScorer.OrderingConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(5.0 / 6.0, result);
+    }
+
+    [Fact]
+    public void OrderingConsistency_returns_one_when_fewer_than_two_unambiguous_matches_remain()
+    {
+        var oldLines = new[] { "dup", "dup" };
+        var newLines = new[] { "dup", "dup" };
+        var candidate = new BlockCandidate(0, 1, 0, 1);
+
+        var result = BlockSimilarityScorer.OrderingConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void OrderingConsistency_excludes_only_the_duplicated_line_and_scores_the_rest()
+    {
+        var oldLines = new[] { "A", "B", "C", "D", "B" };
+        var newLines = new[] { "D", "C", "B", "A" };
+        var candidate = new BlockCandidate(0, 4, 0, 3);
+
+        var result = BlockSimilarityScorer.OrderingConsistency(candidate, oldLines, newLines);
+
+        Assert.Equal(0.0, result);
+    }
 }

@@ -95,6 +95,63 @@ public static class BlockSimilarityScorer
         return minLineCount / (double)maxLineCount;
     }
 
+    public static double OrderingConsistency(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    {
+        var oldHashes = HashRange(oldLines, candidate.OldStart, candidate.OldEnd);
+        var newHashes = HashRange(newLines, candidate.NewStart, candidate.NewEnd);
+
+        var oldHashCounts = oldHashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
+        var newHashCounts = newHashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
+        var newOffsetByHash = newHashes
+            .Select((hash, offset) => (hash, offset))
+            .GroupBy(pair => pair.hash)
+            .ToDictionary(group => group.Key, group => group.First().offset);
+
+        var matchedNewOffsetsInOldOrder = new List<int>();
+
+        foreach (var oldHash in oldHashes)
+        {
+            if (oldHashCounts[oldHash] == 1 && newHashCounts.TryGetValue(oldHash, out var newCount) && newCount == 1)
+            {
+                matchedNewOffsetsInOldOrder.Add(newOffsetByHash[oldHash]);
+            }
+        }
+
+        if (matchedNewOffsetsInOldOrder.Count < 2)
+        {
+            return 1.0;
+        }
+
+        var concordantPairs = 0;
+        var totalPairs = 0;
+
+        for (var i = 0; i < matchedNewOffsetsInOldOrder.Count; i++)
+        {
+            for (var j = i + 1; j < matchedNewOffsetsInOldOrder.Count; j++)
+            {
+                totalPairs++;
+                if (matchedNewOffsetsInOldOrder[j] > matchedNewOffsetsInOldOrder[i])
+                {
+                    concordantPairs++;
+                }
+            }
+        }
+
+        return concordantPairs / (double)totalPairs;
+    }
+
+    private static string[] HashRange(string[] lines, int start, int end)
+    {
+        var hashes = new string[end - start + 1];
+
+        for (var offset = 0; offset < hashes.Length; offset++)
+        {
+            hashes[offset] = LineHasher.Hash(lines[start + offset]).WhitespaceNormalized;
+        }
+
+        return hashes;
+    }
+
     private static List<string> Tokenize(string line)
     {
         var tokens = new List<string>();
