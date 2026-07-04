@@ -425,4 +425,40 @@ public class UnifiedDiffParserTests
     {
         Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseIndexHash("index a29bdeb c0d0fb4"));
     }
+
+    [Fact]
+    public void GitDiffHeaderWithUnchangedPath_ParsesSamePathForOldAndNew()
+    {
+        var header = UnifiedDiffParser.ParseGitDiffHeader("diff --git a/foo.txt b/foo.txt");
+        Assert.Equal("foo.txt", header.OldPath);
+        Assert.Equal("foo.txt", header.NewPath);
+    }
+
+    [Fact]
+    public void GitDiffHeaderWithRenamedPath_ParsesDistinctOldAndNewPaths()
+    {
+        var header = UnifiedDiffParser.ParseGitDiffHeader("diff --git a/old.txt b/new.txt");
+        Assert.Equal("old.txt", header.OldPath);
+        Assert.Equal("new.txt", header.NewPath);
+    }
+
+    [Fact]
+    public void GitDiffHeaderWithUnchangedPathContainingLiteralBSlashSeparator_PrefersSymmetricSplit()
+    {
+        var header = UnifiedDiffParser.ParseGitDiffHeader("diff --git a/dir b/sub.txt b/dir b/sub.txt");
+        Assert.Equal("dir b/sub.txt", header.OldPath);
+        Assert.Equal("dir b/sub.txt", header.NewPath);
+    }
+
+    [Fact]
+    public void GitDiffHeaderWithoutPrefix_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseGitDiffHeader("a/foo.txt b/foo.txt"));
+    }
+
+    [Fact]
+    public void GitDiffHeaderWithoutSeparator_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => UnifiedDiffParser.ParseGitDiffHeader("diff --git a/foo.txt"));
+    }
 }

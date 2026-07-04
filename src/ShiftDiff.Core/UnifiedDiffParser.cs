@@ -36,6 +36,8 @@ public sealed record GitRenameCopyMetadata(GitRenameCopyKind Kind, string Source
 
 public sealed record GitIndexHash(string OldHash, string NewHash, string? Mode);
 
+public sealed record GitDiffHeader(string OldPath, string NewPath);
+
 public static class UnifiedDiffParser
 {
     private static readonly Regex HunkHeaderPattern = new(
@@ -174,6 +176,48 @@ public static class UnifiedDiffParser
         return spaceIndex >= 0
             ? new GitIndexHash(oldHash, afterDots[..spaceIndex], afterDots[(spaceIndex + 1)..])
             : new GitIndexHash(oldHash, afterDots, null);
+    }
+
+    public static GitDiffHeader ParseGitDiffHeader(string line)
+    {
+        const string prefix = "diff --git a/";
+        if (!line.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            throw new FormatException("The line is not a git diff header.");
+        }
+
+        var rest = line[prefix.Length..];
+        var firstSplitIndex = -1;
+        var searchStart = 0;
+        while (true)
+        {
+            var candidateIndex = rest.IndexOf(" b/", searchStart, StringComparison.Ordinal);
+            if (candidateIndex < 0)
+            {
+                break;
+            }
+
+            if (firstSplitIndex < 0)
+            {
+                firstSplitIndex = candidateIndex;
+            }
+
+            var oldPath = rest[..candidateIndex];
+            var newPath = rest[(candidateIndex + 3)..];
+            if (oldPath == newPath)
+            {
+                return new GitDiffHeader(oldPath, newPath);
+            }
+
+            searchStart = candidateIndex + 1;
+        }
+
+        if (firstSplitIndex < 0)
+        {
+            throw new FormatException("The git diff header line has no \" b/\" separator.");
+        }
+
+        return new GitDiffHeader(rest[..firstSplitIndex], rest[(firstSplitIndex + 3)..]);
     }
 
     public static UnifiedDiffHunkHeader ParseHunkHeader(string line)
