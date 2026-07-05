@@ -328,6 +328,10 @@ public static class PatchApplier
         var consideredStartIndices = new HashSet<int>();
         var oldAnchors = AnchorDetector.Detect(hunkOldContent);
         var newAnchors = AnchorDetector.Detect(sourceArray);
+        var oldHashesRaw = hunkOldContent.Select(LineHasher.HashRaw).ToArray();
+        var newHashesRaw = sourceArray.Select(LineHasher.HashRaw).ToArray();
+        var oldHashesNormalized = hunkOldContent.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = sourceArray.Select(LineHasher.HashWhitespaceNormalized).ToArray();
 
         foreach (var candidate in candidates)
         {
@@ -338,7 +342,16 @@ public static class PatchApplier
             }
 
             var fullSpanCandidate = new BlockCandidate(0, length - 1, startIndex, startIndex + length - 1);
-            var score = BlockSimilarityScorer.CombinedScore(fullSpanCandidate, hunkOldContent, sourceArray, oldAnchors, newAnchors);
+            var score = BlockSimilarityScorer.CombinedScore(
+                fullSpanCandidate,
+                hunkOldContent,
+                sourceArray,
+                oldHashesRaw,
+                newHashesRaw,
+                oldHashesNormalized,
+                newHashesNormalized,
+                oldAnchors,
+                newAnchors);
             if (score < threshold || ConfidenceClassifier.Classify(score) == Confidence.Rejected)
             {
                 continue;

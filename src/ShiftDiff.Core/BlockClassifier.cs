@@ -12,15 +12,33 @@ public static class BlockClassifier
         int maxDuplicateAnchorFrequency = int.MaxValue,
         double? pureMoveThreshold = null)
     {
+        if (candidates.Length == 0)
+        {
+            return Array.Empty<BlockMatch>();
+        }
+
         var matches = new BlockMatch[candidates.Length];
         var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
         var (oldAnchors, duplicateCounts) = AnchorDetector.DetectWithDuplicateCounts(oldLines);
         var newAnchors = AnchorDetector.Detect(newLines);
+        var oldHashesRaw = oldLines.Select(LineHasher.HashRaw).ToArray();
+        var newHashesRaw = newLines.Select(LineHasher.HashRaw).ToArray();
+        var oldHashesNormalized = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
 
         for (var index = 0; index < candidates.Length; index++)
         {
             var candidate = candidates[index];
-            var score = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines, oldAnchors, newAnchors);
+            var score = BlockSimilarityScorer.CombinedScore(
+                candidate,
+                oldLines,
+                newLines,
+                oldHashesRaw,
+                newHashesRaw,
+                oldHashesNormalized,
+                newHashesNormalized,
+                oldAnchors,
+                newAnchors);
             var blockSize = candidate.OldEnd - candidate.OldStart + 1;
             var tokenCount = BlockSimilarityScorer.TokenCount(candidate, oldLines, newLines);
             var maxDuplicateCount = 0;
