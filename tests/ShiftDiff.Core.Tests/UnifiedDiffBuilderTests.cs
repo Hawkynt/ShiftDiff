@@ -85,6 +85,42 @@ public class UnifiedDiffBuilderTests
     }
 
     [Fact]
+    public void Build_RemovedLine_ProducesRemovedDiffLine()
+    {
+        var changes = new[]
+        {
+            new LineChange(ChangeType.Unchanged, "a", "a", 0, 0),
+            new LineChange(ChangeType.Removed, "b", null, 1, null),
+            new LineChange(ChangeType.Unchanged, "c", "c", 2, 1),
+        };
+
+        var file = UnifiedDiffBuilder.Build(changes, "old.txt", "new.txt");
+
+        var hunk = Assert.Single(file.Hunks);
+        Assert.Equal(
+            new[]
+            {
+                new UnifiedDiffLine(UnifiedDiffLineKind.Context, "a"),
+                new UnifiedDiffLine(UnifiedDiffLineKind.Removed, "b"),
+                new UnifiedDiffLine(UnifiedDiffLineKind.Context, "c"),
+            },
+            hunk.Lines);
+        Assert.Equal(new UnifiedDiffHunkHeader(1, 3, 1, 2), hunk.Header);
+    }
+
+    [Fact]
+    public void Build_UnsupportedChangeType_ThrowsArgumentOutOfRangeException()
+    {
+        var changes = new[]
+        {
+            new LineChange(ChangeType.Moved, "a", "a", 0, 0),
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => UnifiedDiffBuilder.Build(changes, "old.txt", "new.txt"));
+    }
+
+    [Fact]
     public void Build_ThenFormatThenParse_RoundTripsThroughRealFileComparerOutput()
     {
         var oldText = "one\ntwo\nthree\nfour\nfive\n";
