@@ -144,6 +144,16 @@ public class XmlComparerTests
     }
 
     [Fact]
+    public void Compare_RepeatedAttributeLocalNameAcrossNamespaces_SkippedNotThrown()
+    {
+        var changes = XmlComparer.Compare(
+            """<a xmlns:x="urn:x" xmlns:y="urn:y" x:id="1" y:id="2"/>"""u8.ToArray(),
+            """<a xmlns:x="urn:x" xmlns:y="urn:y" x:id="1" y:id="9"/>"""u8.ToArray());
+
+        Assert.DoesNotContain(changes, c => c.Path == "@id");
+    }
+
+    [Fact]
     public void Compare_LeafElementTextChanged_MarksChangedAtChildPath()
     {
         var changes = XmlComparer.Compare(

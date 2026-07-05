@@ -86,15 +86,26 @@ public static class XmlComparer
 
     private static void CompareAttributes(XElement baseElement, XElement targetElement, string? path, List<XmlChange> changes)
     {
-        var baseAttributes = baseElement.Attributes().ToDictionary(a => a.Name.LocalName, a => a.Value);
-        var targetAttributes = targetElement.Attributes().ToDictionary(a => a.Name.LocalName, a => a.Value);
+        // Two attributes can share a local name while differing only by namespace prefix (e.g.
+        // x:id/y:id) — ambiguous by the same "skip, don't throw" policy already applied to repeated
+        // child element names above, rather than a ToDictionary that throws on the second occurrence.
+        var baseAttributes = baseElement.Attributes().GroupBy(a => a.Name.LocalName).ToDictionary(g => g.Key, g => g.ToArray());
+        var targetAttributes = targetElement.Attributes().GroupBy(a => a.Name.LocalName).ToDictionary(g => g.Key, g => g.ToArray());
 
         var names = baseAttributes.Keys.Union(targetAttributes.Keys).OrderBy(n => n, StringComparer.Ordinal);
 
         foreach (var name in names)
         {
-            var hasOld = baseAttributes.TryGetValue(name, out var oldValue);
-            var hasNew = targetAttributes.TryGetValue(name, out var newValue);
+            var hasOld = baseAttributes.TryGetValue(name, out var oldGroup);
+            var hasNew = targetAttributes.TryGetValue(name, out var newGroup);
+
+            if ((hasOld && oldGroup!.Length > 1) || (hasNew && newGroup!.Length > 1))
+            {
+                continue;
+            }
+
+            var oldValue = hasOld ? oldGroup![0].Value : null;
+            var newValue = hasNew ? newGroup![0].Value : null;
 
             var changeType = (hasOld, hasNew) switch
             {
