@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using ShiftDiff.Core;
 using Xunit;
@@ -105,5 +106,20 @@ public class IniComparerTests
         var change = Assert.Single(changes);
         Assert.Equal("a.key", change.Path);
         Assert.Equal(IniChangeType.Unchanged, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_DottedKeyAndSectionCollide_ProduceDistinctPaths()
+    {
+        var changes = IniComparer.Compare(
+            Bytes(""),
+            Bytes("[a]\nb.c=1\n[a.b]\nc=2\n"));
+
+        Assert.Equal(2, changes.Length);
+        Assert.All(changes, c => Assert.Equal(IniChangeType.Added, c.ChangeType));
+        var paths = changes.Select(c => c.Path).ToArray();
+        Assert.Contains(paths, p => p.EndsWith("b\\.c", StringComparison.Ordinal));
+        Assert.Contains(paths, p => p.EndsWith("b.c", StringComparison.Ordinal) && !p.EndsWith("b\\.c", StringComparison.Ordinal));
+        Assert.Equal(2, paths.Distinct().Count());
     }
 }

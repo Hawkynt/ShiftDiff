@@ -69,7 +69,8 @@ public static class IniComparer
 
             var key = line[..separatorIndex].Trim();
             var value = line[(separatorIndex + 1)..].Trim();
-            var path = section is null ? key : $"{section}.{key}";
+            var escapedKey = key.Replace(".", "\\.");
+            var path = section is null ? escapedKey : $"{section.Replace(".", "\\.")}.{escapedKey}";
             entries[path] = value;
         }
 
