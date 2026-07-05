@@ -183,6 +183,25 @@ public class CliRunnerTests
         }
     }
 
+    [Fact]
+    public void Run_PatchModeMissingPatchFile_ReturnsNonZeroWithFriendlyErrorNotStackTrace()
+    {
+        var sourcePath = WriteTempFile("one\n");
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var missingPatchPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".patch");
+
+        var exitCode = CliRunner.Run(
+            new[] { "--patch", missingPatchPath, "--source", sourcePath },
+            output,
+            error);
+
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains(missingPatchPath, error.ToString());
+        Assert.DoesNotContain("StackTrace", error.ToString());
+        Assert.Equal(string.Empty, output.ToString());
+    }
+
     private static string WriteTempFile(string content) => WriteTempFile(content, ".txt");
 
     private static string WriteTempFile(string content, string extension)
