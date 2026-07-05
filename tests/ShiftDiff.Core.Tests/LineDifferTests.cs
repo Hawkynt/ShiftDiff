@@ -306,4 +306,32 @@ public class LineDifferTests
 
         Assert.Equal(ChangeType.Unchanged, result[0].ChangeType);
     }
+
+    [Fact]
+    public void Diff_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var oldLines = new[] { "line one", "line two", "line three" };
+        var newLines = new[] { "line one", "line TWO", "line three" };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => LineDiffer.Diff(oldLines, newLines, cancellationToken: cts.Token));
+    }
+
+    [Fact]
+    public void Diff_CancelledTokenStillThrows_WhenNoCommonPrefixOrSuffixForcesFullDpTable()
+    {
+        // No shared prefix/suffix lines here, so the DP table is built over the
+        // full input rather than a trimmed middle region — exercises the
+        // cancellation check inside BuildLcsLengthTable's own loop, not just
+        // the top-of-method guard.
+        var oldLines = Enumerable.Range(0, 200).Select(i => $"old-{i}").ToArray();
+        var newLines = Enumerable.Range(0, 200).Select(i => $"new-{i}").ToArray();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => LineDiffer.Diff(oldLines, newLines, cancellationToken: cts.Token));
+    }
 }

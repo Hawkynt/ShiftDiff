@@ -20,8 +20,10 @@ public static class LineDiffer
     // sees the differing middle region, which is what keeps large-but-mostly-
     // unchanged files (the common real-world case at FR-050's scale) fast and
     // within memory.
-    public static LineChange[] Diff(string[] oldLines, string[] newLines, bool ignoreCase = false, WhitespaceMode whitespaceMode = WhitespaceMode.None)
+    public static LineChange[] Diff(string[] oldLines, string[] newLines, bool ignoreCase = false, WhitespaceMode whitespaceMode = WhitespaceMode.None, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         // Precomputed once per side (not per dp-cell) since BuildLcsLengthTable/Backtrack's
         // inner loop is O(n·m) — recomputing the transform per cell would be wasteful.
@@ -43,7 +45,7 @@ public static class LineDiffer
         var oldMidLines = new ArraySegment<string>(oldLines, prefixLen, oldMidLen).ToArray();
         var newMidLines = new ArraySegment<string>(newLines, prefixLen, newMidLen).ToArray();
 
-        var dp = BuildLcsLengthTable(oldMidKeys, newMidKeys, comparison);
+        var dp = BuildLcsLengthTable(oldMidKeys, newMidKeys, comparison, cancellationToken);
         var rawChanges = new List<LineChange>(oldKeys.Length + newKeys.Length);
 
         for (var i = 0; i < prefixLen; i++)
@@ -97,12 +99,18 @@ public static class LineDiffer
         return (prefixLen, suffixLen);
     }
 
-    private static int[,] BuildLcsLengthTable(string[] oldKeys, string[] newKeys, StringComparison comparison)
+    private static int[,] BuildLcsLengthTable(string[] oldKeys, string[] newKeys, StringComparison comparison, CancellationToken cancellationToken)
     {
         var dp = new int[oldKeys.Length + 1, newKeys.Length + 1];
 
         for (var i = oldKeys.Length - 1; i >= 0; i--)
         {
+            // Checked once per row rather than per cell — each row is already
+            // O(newKeys.Length) work, so the extra check is negligible overhead
+            // while still making a 100,000-line diff (FR-050's own target)
+            // interruptible within one row's worth of latency.
+            cancellationToken.ThrowIfCancellationRequested();
+
             for (var j = newKeys.Length - 1; j >= 0; j--)
             {
                 dp[i, j] = string.Equals(oldKeys[i], newKeys[j], comparison)
