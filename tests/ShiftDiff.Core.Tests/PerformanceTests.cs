@@ -11,16 +11,20 @@ public class PerformanceTests
     // Common prefix/suffix trimming keeps LineDiffer's own LCS table tiny
     // here, but FileComparer.Compare still runs full-file block/move
     // detection (BlockBuilder/BlockClassifier) over all 100,000 lines on
-    // both sides regardless of how much is unchanged — measured ~4-5s in
-    // this environment, NOT yet within FR-050's stated 2s target. That gap
-    // is a known, separate follow-up (see tasks/0143's log): AnchorDetector/
-    // BlockBuilder/BlockClassifier still each independently SHA-256-hash
-    // every line (LineHasher.Hash computes 4 hash tiers per call, and
-    // DuplicateCounts/Detect/BlockBuilder each re-hash the same lines
-    // instead of sharing one precomputed hash array). This test is a
-    // regression guard against a *worse* crash-or-hang, not a claim of
-    // FR-050 compliance — don't tighten the threshold to 2000ms until that
-    // follow-up lands.
+    // both sides regardless of how much is unchanged. Two redundancy fixes
+    // (merging AnchorDetector's dual hash pass, then replacing every
+    // single-tier LineHasher.Hash(line).Tier call with a HashRaw/
+    // HashWhitespaceNormalized call that skips the other 3 SHA-256 tiers)
+    // brought this down from ~6.9s to ~1-2s (Debug ~2s, Release ~1s) —
+    // close to FR-050's 2s target but not a formal compliance claim (Debug
+    // build, single environment). Remaining known redundancy, not yet
+    // attempted: BlockSimilarityScorer's per-candidate scoring functions
+    // (ExactHashOverlap/NormalizedHashOverlap/HashRange/
+    // NeighboringBlockConsistency) each rehash the same lines independently
+    // per candidate rather than sharing anchors' already-computed hashes.
+    // This test is a regression guard against a *worse* crash-or-hang, not
+    // a claim of FR-050 compliance — don't tighten the threshold to 2000ms
+    // until that follow-up is measured too.
     [Fact]
     public void Compare_100000LineFilesWithClusteredEdit_CompletesWithoutCrashingOrHanging()
     {
