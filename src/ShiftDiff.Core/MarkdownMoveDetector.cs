@@ -17,7 +17,7 @@ public static class MarkdownMoveDetector
         var matchedRemoved = new HashSet<string>();
         var movedFromByPath = new Dictionary<string, string>();
 
-        foreach (var added in changes.Where(c => c.ChangeType == MarkdownChangeType.Added))
+        foreach (var added in changes.Where(c => c.ChangeType == MarkdownChangeType.Added && HasContent(c.NewValue!)))
         {
             var candidates = removed
                 .Where(r => !matchedRemoved.Contains(r.Path))
@@ -33,7 +33,7 @@ public static class MarkdownMoveDetector
 
         var movedEditedFromByPath = new Dictionary<string, string>();
 
-        foreach (var added in changes.Where(c => c.ChangeType == MarkdownChangeType.Added && !movedFromByPath.ContainsKey(c.Path)))
+        foreach (var added in changes.Where(c => c.ChangeType == MarkdownChangeType.Added && !movedFromByPath.ContainsKey(c.Path) && HasContent(c.NewValue!)))
         {
             var newLines = added.NewValue!.Split('\n');
 
@@ -79,6 +79,13 @@ public static class MarkdownMoveDetector
             })
             .ToArray();
     }
+
+    // Split('\n') on an empty or punctuation-only body never yields a zero-length array, so
+    // matching requires at least one letter-or-digit character on the added side — otherwise two
+    // unrelated empty/token-free sections trivially satisfy exact equality or TokenShingleSimilarity's
+    // both-zero-shingles convention (which returns 1.0, correct for its original composite-score use
+    // but wrong when used alone as the sole gate here).
+    private static bool HasContent(string value) => value.Any(char.IsLetterOrDigit);
 
     // Whole-section-body spans (like FolderRenameDetector's whole-file spans) can differ in line
     // count, so only the offset-independent metric is used — ExactHashOverlap/NormalizedHashOverlap

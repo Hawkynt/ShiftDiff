@@ -105,4 +105,33 @@ public class MarkdownMoveDetectorTests
         Assert.Equal(3, result.Length);
         Assert.All(result, c => Assert.NotEqual(MarkdownChangeType.MovedEdited, c.ChangeType));
     }
+
+    [Fact]
+    public void Detect_TwoUnrelatedEmptyBodySections_NotTreatedAsMoved()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Alpha\n\n# Same\ntext\n"),
+            Bytes("# Zulu\n\n# Same\ntext\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(3, result.Length);
+        Assert.Contains(result, c => c.Path == "# Alpha" && c.ChangeType == MarkdownChangeType.Removed);
+        Assert.Contains(result, c => c.Path == "# Zulu" && c.ChangeType == MarkdownChangeType.Added);
+        Assert.Contains(result, c => c.Path == "# Same" && c.ChangeType == MarkdownChangeType.Unchanged);
+    }
+
+    [Fact]
+    public void Detect_TokenFreePunctuationOnlyBodies_NotTreatedAsMovedEdited()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Alpha\n...\n\n# Same\ntext\n"),
+            Bytes("# Zulu\n---\n\n# Same\ntext\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(3, result.Length);
+        Assert.Contains(result, c => c.Path == "# Alpha" && c.ChangeType == MarkdownChangeType.Removed);
+        Assert.Contains(result, c => c.Path == "# Zulu" && c.ChangeType == MarkdownChangeType.Added);
+    }
 }
