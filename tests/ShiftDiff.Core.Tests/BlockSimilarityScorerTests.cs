@@ -759,4 +759,34 @@ public class BlockSimilarityScorerTests
 
         Assert.Equal(expected, actual);
     }
+
+    [Fact]
+    public void TokenShingleSimilarityFromFingerprint_MatchesConvenienceOverload_ForWholeFileSpan()
+    {
+        var oldLines = new[] { "block line Alpha long enough content", "block line Beta long enough content" };
+        var newLines = new[] { "block line Alpha long enough content", "block line CHANGED long enough content" };
+        var candidate = new BlockCandidate(0, oldLines.Length - 1, 0, newLines.Length - 1);
+
+        var expected = BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines);
+        var oldFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(oldLines);
+        var newFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(newLines);
+        var actual = BlockSimilarityScorer.TokenShingleSimilarityFromFingerprint(oldFingerprint, newFingerprint);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void SimHashSimilarityFromFingerprint_MatchesConvenienceOverload_ForWholeFileSpan()
+    {
+        var oldLines = new[] { "block line Alpha long enough content", "block line Beta long enough content" };
+        var newLines = new[] { "block line Alpha long enough content", "block line CHANGED long enough content" };
+        var candidate = new BlockCandidate(0, oldLines.Length - 1, 0, newLines.Length - 1);
+
+        var expected = BlockSimilarityScorer.SimHashSimilarity(candidate, oldLines, newLines);
+        var oldFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(oldLines);
+        var newFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(newLines);
+        var actual = BlockSimilarityScorer.SimHashSimilarityFromFingerprint(oldFingerprint, newFingerprint);
+
+        Assert.Equal(expected, actual);
+    }
 }

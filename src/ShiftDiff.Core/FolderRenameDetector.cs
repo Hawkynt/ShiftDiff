@@ -17,15 +17,20 @@ public static class FolderRenameDetector
         // rescan shape found repeatedly elsewhere in this repo (BlockClassifier/BlockSimilarityScorer/
         // PatchApplier).
         var removedLinesByPath = removed.ToDictionary(r => r.RelativePath, r => TextFileLoader.Load(baseFiles[r.RelativePath]).Lines);
+        // Precompute each removed file's token-shingle/SimHash fingerprint once too — Similarity used to
+        // derive these fresh from the raw lines on every candidate pair, redoing the same O(fileSize)
+        // tokenize/shingle/fingerprint work once per still-unmatched `added` file it was compared against.
+        var removedFingerprintByPath = removedLinesByPath.ToDictionary(pair => pair.Key, pair => BlockSimilarityScorer.ComputeFileFingerprint(pair.Value));
         var matchedRemoved = new HashSet<string>();
         var renamedFromByAddedPath = new Dictionary<string, string>();
 
         foreach (var added in changes.Where(c => c.ChangeType == FolderChangeType.Added))
         {
             var addedLines = TextFileLoader.Load(targetFiles[added.RelativePath]).Lines;
+            var addedFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(addedLines);
             var candidates = removed
                 .Where(r => !matchedRemoved.Contains(r.RelativePath))
-                .Where(r => Similarity(removedLinesByPath[r.RelativePath], addedLines) >= threshold)
+                .Where(r => Similarity(removedFingerprintByPath[r.RelativePath], addedFingerprint, removedLinesByPath[r.RelativePath], addedLines) >= threshold)
                 .ToList();
 
             if (candidates.Count == 1)
@@ -52,7 +57,7 @@ public static class FolderRenameDetector
     // matched-block callers), so only offset-independent metrics are composed here —
     // ExactHashOverlap/NormalizedHashOverlap assume equal-length paired offsets and
     // would index out of range.
-    private static double Similarity(string[] oldLines, string[] newLines)
+    private static double Similarity(BlockSimilarityScorer.FileFingerprint oldFingerprint, BlockSimilarityScorer.FileFingerprint newFingerprint, string[] oldLines, string[] newLines)
     {
         if (oldLines.Length == 0 || newLines.Length == 0)
         {
@@ -60,8 +65,8 @@ public static class FolderRenameDetector
         }
 
         var candidate = new BlockCandidate(0, oldLines.Length - 1, 0, newLines.Length - 1);
-        return (BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines)
-            + BlockSimilarityScorer.SimHashSimilarity(candidate, oldLines, newLines)
+        return (BlockSimilarityScorer.TokenShingleSimilarityFromFingerprint(oldFingerprint, newFingerprint)
+            + BlockSimilarityScorer.SimHashSimilarityFromFingerprint(oldFingerprint, newFingerprint)
             + BlockSimilarityScorer.BlockSizeRatio(candidate, oldLines, newLines)) / 3.0;
     }
 }

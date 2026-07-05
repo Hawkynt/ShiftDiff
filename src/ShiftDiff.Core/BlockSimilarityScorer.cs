@@ -101,6 +101,50 @@ public static class BlockSimilarityScorer
         return 1.0 - (distance / (double)FingerprintBits);
     }
 
+    public readonly record struct FileFingerprint(HashSet<string> Shingles, ulong SimHash, int TokenCount);
+
+    /// <summary>
+    /// Precomputes the token shingle set and SimHash fingerprint for a whole file so a caller comparing
+    /// one file against many candidates (e.g. <see cref="FolderRenameDetector"/>) doesn't re-tokenize and
+    /// re-hash the same file once per candidate pair. Same precomputed rationale as
+    /// <see cref="ExactHashOverlapFromHashes"/>.
+    /// </summary>
+    public static FileFingerprint ComputeFileFingerprint(string[] lines)
+    {
+        var tokens = TokenizeRange(lines, 0, lines.Length - 1);
+        return new FileFingerprint(BuildShingles(tokens), BuildFingerprint(tokens), tokens.Count);
+    }
+
+    /// <summary>See <see cref="TokenShingleSimilarity"/> — precomputed-fingerprint overload.</summary>
+    public static double TokenShingleSimilarityFromFingerprint(FileFingerprint oldFingerprint, FileFingerprint newFingerprint)
+    {
+        if (oldFingerprint.Shingles.Count == 0 && newFingerprint.Shingles.Count == 0)
+        {
+            return 1.0;
+        }
+
+        var intersectionCount = oldFingerprint.Shingles.Intersect(newFingerprint.Shingles).Count();
+        var unionCount = oldFingerprint.Shingles.Union(newFingerprint.Shingles).Count();
+        return intersectionCount / (double)unionCount;
+    }
+
+    /// <summary>See <see cref="SimHashSimilarity"/> — precomputed-fingerprint overload.</summary>
+    public static double SimHashSimilarityFromFingerprint(FileFingerprint oldFingerprint, FileFingerprint newFingerprint)
+    {
+        if (oldFingerprint.TokenCount == 0 && newFingerprint.TokenCount == 0)
+        {
+            return 1.0;
+        }
+
+        if (oldFingerprint.TokenCount == 0 || newFingerprint.TokenCount == 0)
+        {
+            return 0.0;
+        }
+
+        var distance = HammingDistance(oldFingerprint.SimHash, newFingerprint.SimHash);
+        return 1.0 - (distance / (double)FingerprintBits);
+    }
+
     public static double BlockSizeRatio(BlockCandidate candidate, string[] oldLines, string[] newLines)
     {
         var oldLineCount = candidate.OldEnd - candidate.OldStart + 1;
