@@ -8,7 +8,7 @@ public static class FolderCopyDetector
     {
         var survivors = changes
             .Where(c => c.ChangeType is FolderChangeType.Unchanged
-                or FolderChangeType.Changed or FolderChangeType.Added)
+                or FolderChangeType.Changed)
             .ToList();
         var copiedFromByAddedPath = new Dictionary<string, string>();
 

@@ -114,6 +114,27 @@ public class FolderCopyDetectorTests
     }
 
     [Fact]
+    public void Detect_TwoNewFilesWithIdenticalContent_BothStayAdded_NotMutuallyCopied()
+    {
+        var baseFiles = new Dictionary<string, byte[]>();
+        var targetFiles = new Dictionary<string, byte[]>
+        {
+            ["x.txt"] = new byte[] { 1, 2, 3 },
+            ["y.txt"] = new byte[] { 1, 2, 3 },
+        };
+        var changes = FolderComparer.Compare(baseFiles, targetFiles);
+
+        var result = FolderCopyDetector.Detect(changes, targetFiles);
+
+        var x = result.Single(e => e.RelativePath == "x.txt");
+        var y = result.Single(e => e.RelativePath == "y.txt");
+        Assert.Equal(FolderChangeType.Added, x.ChangeType);
+        Assert.Null(x.CopiedFrom);
+        Assert.Equal(FolderChangeType.Added, y.ChangeType);
+        Assert.Null(y.CopiedFrom);
+    }
+
+    [Fact]
     public void Detect_NoAddedEntries_ReturnsInputUnchanged()
     {
         var baseFiles = new Dictionary<string, byte[]>
