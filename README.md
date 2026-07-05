@@ -27,6 +27,17 @@ what happened to it on the way" instead of just "what lines differ."
 
 Full spec (goals, use cases, UI, roadmap): [SPEC.md](SPEC.md).
 
+## Example
+
+![shiftdiff comparing two files, one method reordered and edited](docs/example.png)
+
+A method (`Validate`/`Describe`) was reordered and its condition edited. This
+is the CLI's current default output — a plain unified diff via
+`FileComparer`/`UnifiedDiffFormatter`. The move/edit-aware classification
+described below (`BlockClassifier`, `Confidence`) is implemented and tested in
+`ShiftDiff.Core`, but isn't wired into the CLI's output yet, so a moved method
+still renders as delete+add here rather than as an annotated move.
+
 ## How it works
 
 The diff engine (`ShiftDiff.Core`) runs a normalize → hash → anchor → block →
@@ -74,18 +85,24 @@ copies, similarity index, `diff --git` paths) and SVN-style diff export:
 The diff/patch **engine** (`ShiftDiff.Core`) implements the pipeline above —
 line hashing, anchor detection, block building/scoring/classification, split
 merge detection, and unified/Git/SVN patch parsing + exact/fuzzy/semantic
-application + export — backed by 198 xunit tests.
+application + export.
 
-**Not built yet:** the CLI (`ShiftDiff.Cli` is still the default console
-scaffold), the desktop UI, and direct Git/SVN repository integration. See
-SPEC.md §8.4/§12 for the planned CLI surface and §17 for MVP scope.
+The **CLI** (`ShiftDiff.Cli`) can run a two-way compare (plain unified diff),
+a three-way base/local/remote merge (conflict markers on unresolved hunks),
+and apply a unified diff patch to a source file — but it calls the plain line
+differ directly, not the semantic engine, so it doesn't yet surface moved
+blocks or confidence levels (see the Example above).
+
+**Not built yet:** the desktop UI and direct Git/SVN repository integration.
+See SPEC.md §8.4/§12 for the planned CLI surface and §17 for MVP scope.
 
 ## Layout
 
 - `src/ShiftDiff.Core` — diff engine (hashing, anchor detection, block
   matching, patch parsing/application). No UI or VCS dependencies.
-- `src/ShiftDiff.Cli` — command-line entry point.
+- `src/ShiftDiff.Cli` — command-line entry point (two-way/three-way compare, patch apply).
 - `tests/ShiftDiff.Core.Tests` — xunit tests for the core engine.
+- `tests/ShiftDiff.Cli.Tests` — xunit tests for the CLI.
 
 UI project (Avalonia) and VCS-integration project are added once the core
 engine covers enough of section 8.2/8.3 of the spec to be worth wrapping.
