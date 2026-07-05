@@ -2,7 +2,17 @@ namespace ShiftDiff.Core;
 
 public static class BlockBuilder
 {
-    public static BlockCandidate[] Build(string[] oldLines, string[] newLines)
+    // excludeSamePosition assumes oldLines/newLines share one coordinate
+    // space (two versions of the same document) — an anchor at the same
+    // index in both really did stay put, so FileComparer's real move
+    // detection correctly skips it. PatchApplier's fragment-search reuse
+    // (searching a small hunk-local array within a whole source file) has no
+    // such shared coordinate space: the fragment's own indices always start
+    // at 0, so a match landing at that same raw source index is a
+    // coincidence, not evidence the content "didn't move" — excluding it
+    // there silently dropped the only valid candidate for any single-line
+    // hunk whose target happened to sit at that source index.
+    public static BlockCandidate[] Build(string[] oldLines, string[] newLines, bool excludeSamePosition = true)
     {
         var oldAnchors = AnchorDetector.Detect(oldLines);
         var newAnchors = AnchorDetector.Detect(newLines);
@@ -25,7 +35,8 @@ public static class BlockBuilder
         {
             var oldHash = oldHashes[oldAnchor.Index];
 
-            if (!newStrongAnchorIndicesByHash.TryGetValue(oldHash, out var newIndex) || newIndex == oldAnchor.Index)
+            if (!newStrongAnchorIndicesByHash.TryGetValue(oldHash, out var newIndex)
+                || (excludeSamePosition && newIndex == oldAnchor.Index))
             {
                 continue;
             }

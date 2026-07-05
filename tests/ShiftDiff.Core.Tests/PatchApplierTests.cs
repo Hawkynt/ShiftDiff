@@ -656,6 +656,126 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void Semantic_PureInsertionHunkWithNoOldLines_AppliesAtRecordedPositionAsExact()
+    {
+        // Counterpart to Fuzzy_PureInsertionHunkWithNoOldLines above — this
+        // exact same short-circuit exists in ApplyHunkSemantic (oldLines.Count
+        // == 0) but had zero direct test coverage before this.
+        var source = new[] { "a", "b", "c" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(2, 0, 2, 1),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Added, "NEW"),
+            });
+
+        var result = PatchApplier.ApplyHunkSemantic(source, hunk);
+
+        Assert.Equal(new[] { "a", "NEW", "b", "c" }, result.Lines);
+        Assert.Equal(PatchApplicationConfidence.Exact, result.Confidence);
+    }
+
+    [Fact]
+    public void ApplyFileSemantic_MultipleHunksAppliedInReverseOrder_ProducesCorrectResult()
+    {
+        // ApplyFileSemantic itself had zero direct test coverage before this
+        // — only its per-hunk building block (ApplyHunkSemantic) was tested.
+        // Mirrors MultiHunkFile_AppliesEachHunkInOrder's exact-mode shape, but
+        // needs anchor-worthy (long/unique) lines — semantic mode's
+        // block-identity search can't work with single-character lines (see
+        // Semantic_HunkTooShortToFormAStrongAnchor above). The first hunk's
+        // target sits at source index 0 on purpose: this is the exact
+        // coincidental-index-collision shape that exposed the
+        // BlockBuilder.Build reuse bug fixed alongside this test (see
+        // Semantic_UnmovedAnchorAtSourceIndexZero_StillApplies below for the
+        // isolated regression case).
+        var source = new[]
+        {
+            "block target Alpha long enough content here",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "block target Epsilon long enough content here",
+        };
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/f", "b/f"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "block target Alpha long enough content here"),
+                        new(UnifiedDiffLineKind.Added, "block target ALPHA long enough content here"),
+                    }),
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(5, 1, 5, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "block target Epsilon long enough content here"),
+                        new(UnifiedDiffLineKind.Added, "block target EPSILON long enough content here"),
+                    }),
+            });
+
+        var result = PatchApplier.ApplyFileSemantic(source, file);
+
+        Assert.Equal(new[]
+        {
+            "block target ALPHA long enough content here",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "block target EPSILON long enough content here",
+        }, result.Lines);
+        // Moved, not Exact — ApplyHunkSemantic's block-identity path always
+        // reports Moved once it had to search by content rather than trust
+        // the recorded line number, even when the match lands back at that
+        // same position (only the oldLines.Count == 0 pure-insertion
+        // short-circuit ever reports Exact).
+        Assert.Equal(PatchApplicationConfidence.Moved, result.Confidence);
+    }
+
+    [Fact]
+    public void Semantic_UnmovedAnchorAtSourceIndexZero_StillApplies()
+    {
+        // Root cause: FindBlockMatchCandidates feeds a hunk-local fragment
+        // (indices always starting at 0) as BlockBuilder.Build's "old" side
+        // and the whole source file as its "new" side. BlockBuilder's
+        // same-position exclusion (`newIndex == oldAnchor.Index`) is correct
+        // for its real use — FileComparer comparing two full file versions in
+        // one shared coordinate space, where equal indices really do mean
+        // "didn't move". Here the two arrays are in different coordinate
+        // spaces, so a purely coincidental collision (fragment-local index 0
+        // landing on source index 0) silently discarded the only valid
+        // candidate — any single-line hunk targeting the first line of the
+        // file failed with "not found anywhere", even though the content is
+        // right there. Fixed by giving BlockBuilder.Build an
+        // excludeSamePosition switch, off for this fragment-search caller.
+        var source = new[]
+        {
+            "block target Alpha long enough content here",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 1, 1, 1),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Removed, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target ALPHA long enough content here"),
+            });
+
+        var result = PatchApplier.ApplyHunkSemantic(source, hunk);
+
+        Assert.Equal(new[]
+        {
+            "block target ALPHA long enough content here",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+        }, result.Lines);
+    }
+
+    [Fact]
     public void FindSemanticCandidates_BlockDuplicatedAtTwoLocations_ReturnsEmptyNotTwoCandidates()
     {
         // Naively expected this to surface 2 ambiguous candidates — it does

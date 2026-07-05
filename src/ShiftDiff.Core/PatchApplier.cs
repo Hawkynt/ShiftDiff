@@ -322,7 +322,9 @@ public static class PatchApplier
             return results;
         }
 
-        var candidates = BlockBuilder.Build(hunkOldContent, sourceArray);
+        // Fragment-in-file search, not full-document comparison — see
+        // BlockBuilder.Build's excludeSamePosition doc comment.
+        var candidates = BlockBuilder.Build(hunkOldContent, sourceArray, excludeSamePosition: false);
         if (candidates.Length == 0)
         {
             return results;
