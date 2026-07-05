@@ -47,6 +47,7 @@ public static class MarkdownComparer
         var headingStack = new List<string>();
         var currentKey = "";
         var currentContent = new List<string>();
+        var insideCodeFence = false;
 
         void Flush()
         {
@@ -63,7 +64,14 @@ public static class MarkdownComparer
         {
             var line = rawLine.TrimEnd('\r');
 
-            if (TryGetHeadingLevel(line, out var level))
+            if (IsCodeFenceDelimiter(line))
+            {
+                insideCodeFence = !insideCodeFence;
+                currentContent.Add(line);
+                continue;
+            }
+
+            if (!insideCodeFence && TryGetHeadingLevel(line, out var level))
             {
                 Flush();
 
@@ -89,6 +97,12 @@ public static class MarkdownComparer
         Flush();
 
         return sections;
+    }
+
+    private static bool IsCodeFenceDelimiter(string line)
+    {
+        var trimmed = line.TrimStart();
+        return trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal);
     }
 
     private static bool TryGetHeadingLevel(string line, out int level)

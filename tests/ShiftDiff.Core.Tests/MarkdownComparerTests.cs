@@ -121,4 +121,18 @@ public class MarkdownComparerTests
         Assert.Equal("first", change.OldValue);
         Assert.Equal("first-CHANGED", change.NewValue);
     }
+
+    [Fact]
+    public void Compare_HeadingLikeLineInsideCodeFence_StaysPartOfEnclosingSection()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Foo\n```\n# not a heading\ncode line\n```\n"),
+            Bytes("# Foo\n```\n# not a heading\ncode line changed\n```\n"));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("# Foo", change.Path);
+        Assert.Equal(MarkdownChangeType.Changed, change.ChangeType);
+        Assert.Contains("# not a heading", change.OldValue);
+        Assert.Contains("code line", change.OldValue);
+    }
 }
