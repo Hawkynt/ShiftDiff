@@ -132,4 +132,14 @@ public class XmlComparerTests
         Assert.Equal("b/c/@x", change.Path);
         Assert.Equal(XmlChangeType.Changed, change.ChangeType);
     }
+
+    [Fact]
+    public void Compare_RepeatedSiblingName_SkippedNotThrown()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><item n="1"/><item n="2"/></a>"""u8.ToArray(),
+            """<a><item n="1"/><item n="9"/></a>"""u8.ToArray());
+
+        Assert.Empty(changes);
+    }
 }

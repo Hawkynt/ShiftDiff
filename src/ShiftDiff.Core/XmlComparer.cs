@@ -29,16 +29,24 @@ public static class XmlComparer
     {
         CompareAttributes(baseElement, targetElement, path, changes);
 
-        // Deferred: repeated same-name child elements (e.g. lists) throw on ToDictionary; only single-occurrence names are supported so far.
-        var baseChildren = baseElement.Elements().ToDictionary(e => e.Name.LocalName, e => e);
-        var targetChildren = targetElement.Elements().ToDictionary(e => e.Name.LocalName, e => e);
+        // Repeated same-name child elements (e.g. lists) are skipped, not thrown on — list/positional diffing is a separate, deferred slice.
+        var baseChildren = baseElement.Elements().GroupBy(e => e.Name.LocalName).ToDictionary(g => g.Key, g => g.ToArray());
+        var targetChildren = targetElement.Elements().GroupBy(e => e.Name.LocalName).ToDictionary(g => g.Key, g => g.ToArray());
 
         var childNames = baseChildren.Keys.Union(targetChildren.Keys).OrderBy(n => n, StringComparer.Ordinal);
 
         foreach (var name in childNames)
         {
-            var hasOld = baseChildren.TryGetValue(name, out var oldChild);
-            var hasNew = targetChildren.TryGetValue(name, out var newChild);
+            var hasOld = baseChildren.TryGetValue(name, out var oldGroup);
+            var hasNew = targetChildren.TryGetValue(name, out var newGroup);
+
+            if ((hasOld && oldGroup!.Length > 1) || (hasNew && newGroup!.Length > 1))
+            {
+                continue;
+            }
+
+            var oldChild = hasOld ? oldGroup![0] : null;
+            var newChild = hasNew ? newGroup![0] : null;
             var childPath = path is null ? name : $"{path}/{name}";
 
             if (hasOld && hasNew)
