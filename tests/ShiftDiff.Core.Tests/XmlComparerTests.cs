@@ -258,4 +258,18 @@ public class XmlComparerTests
         Assert.Null(change.Path);
         Assert.Equal(XmlChangeType.Unchanged, change.ChangeType);
     }
+
+    [Fact]
+    public void Compare_RootElementNameChanged_MarksSingleChangeAtNullPath()
+    {
+        var changes = XmlComparer.Compare(
+            """<a b="1"/>"""u8.ToArray(),
+            """<c b="1"/>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+        Assert.Equal("a", change.OldValue);
+        Assert.Equal("c", change.NewValue);
+    }
 }

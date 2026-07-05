@@ -32,6 +32,11 @@ public static class XmlComparer
             return [new XmlChange(null, oldRawText == newRawText ? XmlChangeType.Unchanged : XmlChangeType.Changed, oldRawText, newRawText)];
         }
 
+        if (baseRoot.Name != targetRoot.Name)
+        {
+            return [new XmlChange(null, XmlChangeType.Changed, baseRoot.Name.LocalName, targetRoot.Name.LocalName)];
+        }
+
         var changes = new List<XmlChange>();
         CompareElements(baseRoot, targetRoot, path: null, changes);
         return changes.ToArray();
