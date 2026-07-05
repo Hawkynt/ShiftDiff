@@ -5,16 +5,17 @@ public static class SplitMergeDetector
     public static BlockMatch[] Detect(BlockMatch[] matches)
     {
         var result = (BlockMatch[])matches.Clone();
+        var original = (BlockMatch[])matches.Clone();
 
-        for (var index = 0; index < result.Length - 1; index++)
+        for (var index = 0; index < original.Length - 1; index++)
         {
-            var current = result[index];
-            var next = result[index + 1];
+            var current = original[index];
+            var next = original[index + 1];
 
             if (IsMovedFamily(current.MatchType) && IsMovedFamily(next.MatchType) && current.OldEnd + 1 == next.OldStart)
             {
-                result[index] = current with { MatchType = ChangeType.Split };
-                result[index + 1] = next with { MatchType = ChangeType.Split };
+                result[index] = result[index] with { MatchType = ChangeType.Split };
+                result[index + 1] = result[index + 1] with { MatchType = ChangeType.Split };
             }
         }
 

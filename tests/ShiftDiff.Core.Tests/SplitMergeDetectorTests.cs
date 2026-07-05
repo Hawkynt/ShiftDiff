@@ -96,4 +96,21 @@ public class SplitMergeDetectorTests
         Assert.Equal(ChangeType.Split, result[1].MatchType);
         Assert.Equal(ChangeType.Moved, result[2].MatchType);
     }
+
+    [Fact]
+    public void Detect_reclassifies_all_three_as_split_when_old_side_is_a_contiguous_chain()
+    {
+        var matches = new[]
+        {
+            new BlockMatch(1, 2, 10, 11, ChangeType.Moved, 0.9, Confidence.Certain),
+            new BlockMatch(3, 4, 50, 51, ChangeType.Moved, 0.9, Confidence.Certain),
+            new BlockMatch(5, 6, 90, 91, ChangeType.Moved, 0.9, Confidence.Certain),
+        };
+
+        var result = SplitMergeDetector.Detect(matches);
+
+        Assert.Equal(ChangeType.Split, result[0].MatchType);
+        Assert.Equal(ChangeType.Split, result[1].MatchType);
+        Assert.Equal(ChangeType.Split, result[2].MatchType);
+    }
 }
