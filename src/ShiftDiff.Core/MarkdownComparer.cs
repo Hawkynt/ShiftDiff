@@ -9,6 +9,7 @@ public enum MarkdownChangeType
     Changed,
     Unchanged,
     Moved,
+    MovedEdited,
 }
 
 public sealed record MarkdownChange(string Path, MarkdownChangeType ChangeType, string? OldValue = null, string? NewValue = null, LineChange[]? BodyChanges = null, string? MovedFrom = null);

@@ -74,4 +74,35 @@ public class MarkdownMoveDetectorTests
 
         Assert.Equal(changes, result);
     }
+
+    [Fact]
+    public void Detect_SimilarButEditedContentAtDifferentHeading_MarksMovedEditedWithMovedFrom()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Old\noriginal body text here\n"),
+            Bytes("# New\noriginal body text HERE-changed-a-bit\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        var movedEdited = Assert.Single(result);
+        Assert.Equal(MarkdownChangeType.MovedEdited, movedEdited.ChangeType);
+        Assert.Equal("# New", movedEdited.Path);
+        Assert.Equal("# Old", movedEdited.MovedFrom);
+        Assert.Equal("original body text here", movedEdited.OldValue);
+        Assert.Equal("original body text HERE-changed-a-bit", movedEdited.NewValue);
+        Assert.NotNull(movedEdited.BodyChanges);
+    }
+
+    [Fact]
+    public void Detect_AmbiguousMultipleFuzzyCandidates_LeavesAsAddedAndRemoved()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# A\noriginal body text here\n\n# B\noriginal body text here too\n"),
+            Bytes("# C\noriginal body text HERE-changed-a-bit\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(3, result.Length);
+        Assert.All(result, c => Assert.NotEqual(MarkdownChangeType.MovedEdited, c.ChangeType));
+    }
 }
