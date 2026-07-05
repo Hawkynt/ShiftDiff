@@ -62,6 +62,8 @@ public class PerformanceTests
         var exception = Assert.Throws<DiffTooLargeException>(() => FileComparer.Compare(oldContent, newContent));
         Assert.Equal(100_000, exception.OldLineCount);
         Assert.Equal(100_000, exception.NewLineCount);
+        Assert.InRange(exception.TrimmedOldLineCount, 1, exception.OldLineCount);
+        Assert.InRange(exception.TrimmedNewLineCount, 1, exception.NewLineCount);
     }
 
     private static string[] GenerateLines(int count, int seed)
