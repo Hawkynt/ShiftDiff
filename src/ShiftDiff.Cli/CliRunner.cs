@@ -34,7 +34,7 @@ public static class CliRunner
             oldContent = File.ReadAllBytes(oldPath);
             newContent = File.ReadAllBytes(newPath);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -60,7 +60,7 @@ public static class CliRunner
             patchLines = File.ReadAllLines(patchPath);
             sourceLines = File.ReadAllLines(sourcePath);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             error.WriteLine($"error: {ex.Message}");
             return 1;
@@ -104,7 +104,7 @@ public static class CliRunner
             localLines = File.ReadAllLines(localPath);
             remoteLines = File.ReadAllLines(remotePath);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             error.WriteLine($"error: {ex.Message}");
             return 1;

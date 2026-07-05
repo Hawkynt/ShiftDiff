@@ -79,6 +79,35 @@ public class CliRunnerTests
         Assert.Equal(string.Empty, output.ToString());
     }
 
+    [Fact]
+    public void Run_UnreadableFile_ReturnsNonZeroWithFriendlyErrorNotUnhandledException()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var newPath = WriteTempFile("one\n");
+        var unreadablePath = WriteTempFile("two\n");
+        File.SetUnixFileMode(unreadablePath, UnixFileMode.None);
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        try
+        {
+            var exitCode = CliRunner.Run(new[] { unreadablePath, newPath }, output, error);
+
+            Assert.NotEqual(0, exitCode);
+            Assert.Contains(unreadablePath, error.ToString());
+            Assert.DoesNotContain("StackTrace", error.ToString());
+            Assert.Equal(string.Empty, output.ToString());
+        }
+        finally
+        {
+            File.SetUnixFileMode(unreadablePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
     private static string WriteTempFile(string content)
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
