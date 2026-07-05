@@ -273,6 +273,24 @@ public class BlockSimilarityScorerTests
     }
 
     [Fact]
+    public void TokenShingleSimilarity_returns_one_when_both_sides_have_no_tokens()
+    {
+        var oldLines = new[]
+        {
+            "   !!!",
+        };
+        var newLines = new[]
+        {
+            "\t---",
+        };
+        var candidate = new BlockCandidate(0, 0, 0, 0);
+
+        var result = BlockSimilarityScorer.TokenShingleSimilarity(candidate, oldLines, newLines);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
     public void SimHashSimilarity_returns_one_for_identical_content()
     {
         var oldLines = new[]
@@ -788,5 +806,38 @@ public class BlockSimilarityScorerTests
         var actual = BlockSimilarityScorer.SimHashSimilarityFromFingerprint(oldFingerprint, newFingerprint);
 
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void TokenShingleSimilarityFromFingerprint_returns_one_when_both_sides_have_no_tokens()
+    {
+        var oldFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(new[] { "   !!!" });
+        var newFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(new[] { "\t---" });
+
+        var result = BlockSimilarityScorer.TokenShingleSimilarityFromFingerprint(oldFingerprint, newFingerprint);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void SimHashSimilarityFromFingerprint_returns_one_when_both_sides_have_no_tokens()
+    {
+        var oldFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(new[] { "   !!!" });
+        var newFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(new[] { "\t---" });
+
+        var result = BlockSimilarityScorer.SimHashSimilarityFromFingerprint(oldFingerprint, newFingerprint);
+
+        Assert.Equal(1.0, result);
+    }
+
+    [Fact]
+    public void SimHashSimilarityFromFingerprint_returns_zero_when_only_one_side_has_tokens()
+    {
+        var oldFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(new[] { "foo bar baz" });
+        var newFingerprint = BlockSimilarityScorer.ComputeFileFingerprint(new[] { "   !!!" });
+
+        var result = BlockSimilarityScorer.SimHashSimilarityFromFingerprint(oldFingerprint, newFingerprint);
+
+        Assert.Equal(0.0, result);
     }
 }
