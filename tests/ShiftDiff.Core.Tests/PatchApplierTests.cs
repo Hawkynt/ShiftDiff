@@ -429,6 +429,41 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void ApplyPatchExact_TwoFilesShareTargetPath_ThrowsInsteadOfSilentlyDroppingOne()
+    {
+        var fileA = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/src1.txt", "b/out.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Context, "one"),
+                    }),
+            });
+        var fileB = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/src2.txt", "b/out.txt"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Context, "two"),
+                    }),
+            });
+        var patch = new UnifiedDiffPatch(new[] { fileA, fileB });
+        var sources = new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["a/src1.txt"] = new[] { "one" },
+            ["a/src2.txt"] = new[] { "two" },
+        };
+
+        Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyPatchExact(patch, sources));
+    }
+
+    [Fact]
     public void Fuzzy_MultiHunkFile_OneHunkShiftedAndOneExact_FileConfidenceIsHighOverall()
     {
         // First hunk's context ("a") only occurs at its recorded exact

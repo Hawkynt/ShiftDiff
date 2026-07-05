@@ -73,7 +73,11 @@ public static class PatchApplier
                 throw new PatchApplicationException($"No source provided for path '{sourcePath}'.");
             }
 
-            result[file.Header.TargetPath] = ApplyFileExact(sourceLines, file);
+            if (!result.TryAdd(file.Header.TargetPath, ApplyFileExact(sourceLines, file)))
+            {
+                throw new PatchApplicationException(
+                    $"Multiple patch files map to the same target path '{file.Header.TargetPath}'.");
+            }
         }
 
         return result;
