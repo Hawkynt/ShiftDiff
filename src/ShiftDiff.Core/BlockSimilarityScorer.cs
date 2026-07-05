@@ -155,11 +155,16 @@ public static class BlockSimilarityScorer
         return hashes;
     }
 
-    public static double RarityWeightedAnchorScore(BlockCandidate candidate, string[] oldLines, string[] newLines)
-    {
-        var oldAnchors = AnchorDetector.Detect(oldLines);
-        var newAnchors = AnchorDetector.Detect(newLines);
+    public static double RarityWeightedAnchorScore(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        RarityWeightedAnchorScore(candidate, AnchorDetector.Detect(oldLines), AnchorDetector.Detect(newLines));
 
+    /// <summary>
+    /// Overload taking already-computed anchors — avoids re-running <see cref="AnchorDetector.Detect"/>
+    /// (an O(n) pass) once per candidate when a caller (e.g. <see cref="BlockClassifier.Classify"/>)
+    /// scores many candidates against the same fixed oldLines/newLines.
+    /// </summary>
+    public static double RarityWeightedAnchorScore(BlockCandidate candidate, LineAnchor[] oldAnchors, LineAnchor[] newAnchors)
+    {
         var oldStrongFraction = StrongFraction(oldAnchors, candidate.OldStart, candidate.OldEnd);
         var newStrongFraction = StrongFraction(newAnchors, candidate.NewStart, candidate.NewEnd);
 
@@ -220,13 +225,19 @@ public static class BlockSimilarityScorer
     }
 
     public static double CombinedScore(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        CombinedScore(candidate, oldLines, newLines, AnchorDetector.Detect(oldLines), AnchorDetector.Detect(newLines));
+
+    /// <summary>
+    /// Overload taking already-computed anchors — see <see cref="RarityWeightedAnchorScore(BlockCandidate, LineAnchor[], LineAnchor[])"/>.
+    /// </summary>
+    public static double CombinedScore(BlockCandidate candidate, string[] oldLines, string[] newLines, LineAnchor[] oldAnchors, LineAnchor[] newAnchors) =>
         (ExactHashOverlap(candidate, oldLines, newLines)
          + NormalizedHashOverlap(candidate, oldLines, newLines)
          + TokenShingleSimilarity(candidate, oldLines, newLines)
          + SimHashSimilarity(candidate, oldLines, newLines)
          + BlockSizeRatio(candidate, oldLines, newLines)
          + OrderingConsistency(candidate, oldLines, newLines)
-         + RarityWeightedAnchorScore(candidate, oldLines, newLines)
+         + RarityWeightedAnchorScore(candidate, oldAnchors, newAnchors)
          + NeighboringBlockConsistency(candidate, oldLines, newLines)) / 8.0;
 
     private static List<string> Tokenize(string line)

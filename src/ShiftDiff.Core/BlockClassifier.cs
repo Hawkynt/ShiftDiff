@@ -15,11 +15,13 @@ public static class BlockClassifier
         var matches = new BlockMatch[candidates.Length];
         var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
         var duplicateCounts = AnchorDetector.DuplicateCounts(oldLines);
+        var oldAnchors = AnchorDetector.Detect(oldLines);
+        var newAnchors = AnchorDetector.Detect(newLines);
 
         for (var index = 0; index < candidates.Length; index++)
         {
             var candidate = candidates[index];
-            var score = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines);
+            var score = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines, oldAnchors, newAnchors);
             var blockSize = candidate.OldEnd - candidate.OldStart + 1;
             var tokenCount = BlockSimilarityScorer.TokenCount(candidate, oldLines, newLines);
             var maxDuplicateCount = 0;
