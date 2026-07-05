@@ -13,6 +13,7 @@ public class FileComparerTests
         var result = FileComparer.Compare(content, content);
 
         Assert.All(result.Changes, change => Assert.Equal(ChangeType.Unchanged, change.ChangeType));
+        Assert.All(result.Changes, change => Assert.Null(change.TokenChanges));
         Assert.Empty(result.MovedBlocks);
     }
 
@@ -26,6 +27,19 @@ public class FileComparerTests
 
         Assert.Contains(result.Changes, change => change.ChangeType == ChangeType.Edited && change.OldLine == "beta" && change.NewLine == "BETA");
         Assert.Empty(result.MovedBlocks);
+    }
+
+    [Fact]
+    public void Compare_SimpleEdit_TokenChangesIsolateTheChangedWord()
+    {
+        var oldContent = Encoding.UTF8.GetBytes("alpha\nbeta\ngamma\n");
+        var newContent = Encoding.UTF8.GetBytes("alpha\nBETA\ngamma\n");
+
+        var result = FileComparer.Compare(oldContent, newContent);
+
+        var edited = Assert.Single(result.Changes, change => change.ChangeType == ChangeType.Edited);
+        Assert.NotNull(edited.TokenChanges);
+        Assert.Contains(edited.TokenChanges!, tc => tc.ChangeType != ChangeType.Unchanged && (tc.OldToken == "beta" || tc.NewToken == "BETA"));
     }
 
     [Fact]

@@ -5,4 +5,5 @@ public sealed record LineChange(
     string? OldLine = null,
     string? NewLine = null,
     int? OldIndex = null,
-    int? NewIndex = null);
+    int? NewIndex = null,
+    TokenChange[]? TokenChanges = null);
