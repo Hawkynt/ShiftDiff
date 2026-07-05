@@ -119,4 +119,14 @@ public class TextFileLoaderTests
 
         Assert.Equal(LineEnding.Mixed, result.OriginalEnding);
     }
+
+    [Fact]
+    public void Load_EmptyContent_DefaultsToUtf8WithSingleEmptyLine()
+    {
+        var result = TextFileLoader.Load(Array.Empty<byte>());
+
+        Assert.Equal("utf-8", result.Encoding.WebName);
+        Assert.Equal(new[] { "" }, result.Lines);
+        Assert.Equal(LineEnding.Lf, result.OriginalEnding);
+    }
 }
