@@ -142,4 +142,84 @@ public class XmlComparerTests
 
         Assert.Empty(changes);
     }
+
+    [Fact]
+    public void Compare_LeafElementTextChanged_MarksChangedAtChildPath()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><name>old</name></a>"""u8.ToArray(),
+            """<a><name>new</name></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("name", change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+        Assert.Equal("old", change.OldValue);
+        Assert.Equal("new", change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_LeafElementTextSame_MarksUnchanged()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><name>same</name></a>"""u8.ToArray(),
+            """<a><name>same</name></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("name", change.Path);
+        Assert.Equal(XmlChangeType.Unchanged, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_LeafElementTextAdded_MarksAdded()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><name></name></a>"""u8.ToArray(),
+            """<a><name>value</name></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("name", change.Path);
+        Assert.Equal(XmlChangeType.Added, change.ChangeType);
+        Assert.Null(change.OldValue);
+        Assert.Equal("value", change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_LeafElementTextRemoved_MarksRemoved()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><name>value</name></a>"""u8.ToArray(),
+            """<a><name></name></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("name", change.Path);
+        Assert.Equal(XmlChangeType.Removed, change.ChangeType);
+        Assert.Equal("value", change.OldValue);
+        Assert.Null(change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_RootLeafTextChanged_MarksChangedAtNullPath()
+    {
+        var changes = XmlComparer.Compare(
+            """<a>hello</a>"""u8.ToArray(),
+            """<a>world</a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+        Assert.Equal("hello", change.OldValue);
+        Assert.Equal("world", change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_WhitespaceOnlyTextAroundChildElement_IgnoredNotCompared()
+    {
+        var changes = XmlComparer.Compare(
+            """<a>  <b x="1"/>  </a>"""u8.ToArray(),
+            """<a><b x="1"/></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("b/@x", change.Path);
+        Assert.Equal(XmlChangeType.Unchanged, change.ChangeType);
+    }
 }

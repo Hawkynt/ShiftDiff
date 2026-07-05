@@ -29,6 +29,13 @@ public static class XmlComparer
     {
         CompareAttributes(baseElement, targetElement, path, changes);
 
+        // Text content only counts when neither side has child elements — an element with children has its
+        // structure captured by the child-recursion below, and any surrounding text is formatting whitespace.
+        if (!baseElement.Elements().Any() && !targetElement.Elements().Any())
+        {
+            CompareText(baseElement, targetElement, path, changes);
+        }
+
         // Repeated same-name child elements (e.g. lists) are skipped, not thrown on — list/positional diffing is a separate, deferred slice.
         var baseChildren = baseElement.Elements().GroupBy(e => e.Name.LocalName).ToDictionary(g => g.Key, g => g.ToArray());
         var targetChildren = targetElement.Elements().GroupBy(e => e.Name.LocalName).ToDictionary(g => g.Key, g => g.ToArray());
@@ -83,5 +90,26 @@ public static class XmlComparer
             var attributePath = path is null ? $"@{name}" : $"{path}/@{name}";
             changes.Add(new XmlChange(attributePath, changeType, hasOld ? oldValue : null, hasNew ? newValue : null));
         }
+    }
+
+    private static void CompareText(XElement baseElement, XElement targetElement, string? path, List<XmlChange> changes)
+    {
+        var oldText = baseElement.Value;
+        var newText = targetElement.Value;
+
+        if (oldText.Length == 0 && newText.Length == 0)
+        {
+            return;
+        }
+
+        var changeType = (oldText.Length, newText.Length) switch
+        {
+            (0, > 0) => XmlChangeType.Added,
+            (> 0, 0) => XmlChangeType.Removed,
+            _ when oldText == newText => XmlChangeType.Unchanged,
+            _ => XmlChangeType.Changed,
+        };
+
+        changes.Add(new XmlChange(path, changeType, oldText.Length == 0 ? null : oldText, newText.Length == 0 ? null : newText));
     }
 }
