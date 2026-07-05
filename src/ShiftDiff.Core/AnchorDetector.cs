@@ -25,8 +25,12 @@ public static class AnchorDetector
 
     public static LineAnchor[] Detect(string[] lines)
     {
-        var whitespaceNormalizedCounts = lines
-            .Select(line => LineHasher.Hash(line).WhitespaceNormalized)
+        // Hash each line exactly once (SHA-256 x4 per LineHasher.Hash call is not
+        // cheap at 100,000-line scale) and reuse it for both the duplicate-count
+        // grouping and per-line classification below, instead of hashing every
+        // line twice.
+        var lineHashes = lines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
+        var whitespaceNormalizedCounts = lineHashes
             .GroupBy(hash => hash)
             .ToDictionary(group => group.Key, group => group.Count());
 
@@ -34,13 +38,13 @@ public static class AnchorDetector
 
         for (var index = 0; index < lines.Length; index++)
         {
-            anchors[index] = new LineAnchor(index, lines[index], ClassifyLine(lines[index], whitespaceNormalizedCounts));
+            anchors[index] = new LineAnchor(index, lines[index], ClassifyLine(lines[index], lineHashes[index], whitespaceNormalizedCounts));
         }
 
         return anchors;
     }
 
-    private static AnchorQuality ClassifyLine(string line, Dictionary<string, int> whitespaceNormalizedCounts)
+    private static AnchorQuality ClassifyLine(string line, string whitespaceNormalizedHash, Dictionary<string, int> whitespaceNormalizedCounts)
     {
         var trimmed = line.Trim();
 
@@ -49,7 +53,7 @@ public static class AnchorDetector
             return AnchorQuality.Rejected;
         }
 
-        if (whitespaceNormalizedCounts[LineHasher.Hash(line).WhitespaceNormalized] > 1 || trimmed.Length < 8)
+        if (whitespaceNormalizedCounts[whitespaceNormalizedHash] > 1 || trimmed.Length < 8)
         {
             return AnchorQuality.Weak;
         }

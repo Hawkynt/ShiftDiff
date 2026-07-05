@@ -2,10 +2,24 @@ namespace ShiftDiff.Core;
 
 public static class LineDiffer
 {
+    // Beyond this many DP cells (~80 MB as an int[,] table), the classic
+    // O(n*m) LCS table stops being a reasonable in-memory structure — FR-050
+    // targets a 100,000-line initial diff, and a full table at that scale
+    // would need tens of gigabytes (or simply fail to allocate, see
+    // DiffTooLargeException). Fail clearly instead of crashing with a raw
+    // OutOfMemoryException / "array dimensions exceeded" error.
+    private const long MaxLcsTableCells = 20_000_000L;
+
     // Classic LCS-alignment diff: dp[i, j] holds the LCS length of
     // oldLines[i..] and newLines[j..]. Backtracking forward from (0, 0) and
     // preferring the branch with the longer remaining LCS yields the usual
     // "diff" output (minimal Added/Removed set around a common subsequence).
+    //
+    // Common prefix/suffix lines are trimmed before the DP runs (standard
+    // diff-tool optimization, matches git/GNU diffutils) — the DP only ever
+    // sees the differing middle region, which is what keeps large-but-mostly-
+    // unchanged files (the common real-world case at FR-050's scale) fast and
+    // within memory.
     public static LineChange[] Diff(string[] oldLines, string[] newLines, bool ignoreCase = false, WhitespaceMode whitespaceMode = WhitespaceMode.None)
     {
         var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -13,8 +27,39 @@ public static class LineDiffer
         // inner loop is O(n·m) — recomputing the transform per cell would be wasteful.
         var oldKeys = oldLines.Select(line => NormalizeForComparison(line, whitespaceMode)).ToArray();
         var newKeys = newLines.Select(line => NormalizeForComparison(line, whitespaceMode)).ToArray();
-        var dp = BuildLcsLengthTable(oldKeys, newKeys, comparison);
-        var rawChanges = Backtrack(oldLines, newLines, oldKeys, newKeys, dp, comparison);
+
+        var (prefixLen, suffixLen) = TrimCommonPrefixAndSuffix(oldKeys, newKeys, comparison);
+        var oldMidLen = oldKeys.Length - prefixLen - suffixLen;
+        var newMidLen = newKeys.Length - prefixLen - suffixLen;
+
+        var cellCount = (long)(oldMidLen + 1) * (newMidLen + 1);
+        if (cellCount > MaxLcsTableCells)
+        {
+            throw new DiffTooLargeException(oldKeys.Length, newKeys.Length, oldMidLen, newMidLen, MaxLcsTableCells);
+        }
+
+        var oldMidKeys = new ArraySegment<string>(oldKeys, prefixLen, oldMidLen).ToArray();
+        var newMidKeys = new ArraySegment<string>(newKeys, prefixLen, newMidLen).ToArray();
+        var oldMidLines = new ArraySegment<string>(oldLines, prefixLen, oldMidLen).ToArray();
+        var newMidLines = new ArraySegment<string>(newLines, prefixLen, newMidLen).ToArray();
+
+        var dp = BuildLcsLengthTable(oldMidKeys, newMidKeys, comparison);
+        var rawChanges = new List<LineChange>(oldKeys.Length + newKeys.Length);
+
+        for (var i = 0; i < prefixLen; i++)
+        {
+            rawChanges.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[i], OldIndex: i, NewIndex: i));
+        }
+
+        rawChanges.AddRange(Backtrack(oldMidLines, newMidLines, oldMidKeys, newMidKeys, dp, comparison, indexOffset: prefixLen));
+
+        for (var i = 0; i < suffixLen; i++)
+        {
+            var oldIndex = oldKeys.Length - suffixLen + i;
+            var newIndex = newKeys.Length - suffixLen + i;
+            rawChanges.Add(new LineChange(ChangeType.Unchanged, oldLines[oldIndex], newLines[newIndex], OldIndex: oldIndex, NewIndex: newIndex));
+        }
+
         return CoalesceAdjacentRemovedAndAddedIntoEdited(rawChanges);
     }
 
@@ -27,6 +72,30 @@ public static class LineDiffer
         WhitespaceMode.RemoveAll => LineNormalizer.RemoveWhitespace(line),
         _ => line,
     };
+
+    // Trims the maximal common prefix and suffix shared by both sides —
+    // provably safe for LCS-based diff (any optimal alignment keeps these
+    // ends matched), and the standard first step in every production diff
+    // tool. Capped so prefix+suffix never exceeds either side's length.
+    private static (int prefixLen, int suffixLen) TrimCommonPrefixAndSuffix(string[] oldKeys, string[] newKeys, StringComparison comparison)
+    {
+        var minLen = Math.Min(oldKeys.Length, newKeys.Length);
+
+        var prefixLen = 0;
+        while (prefixLen < minLen && string.Equals(oldKeys[prefixLen], newKeys[prefixLen], comparison))
+        {
+            prefixLen++;
+        }
+
+        var suffixLen = 0;
+        while (suffixLen < minLen - prefixLen
+            && string.Equals(oldKeys[oldKeys.Length - 1 - suffixLen], newKeys[newKeys.Length - 1 - suffixLen], comparison))
+        {
+            suffixLen++;
+        }
+
+        return (prefixLen, suffixLen);
+    }
 
     private static int[,] BuildLcsLengthTable(string[] oldKeys, string[] newKeys, StringComparison comparison)
     {
@@ -45,7 +114,7 @@ public static class LineDiffer
         return dp;
     }
 
-    private static List<LineChange> Backtrack(string[] oldLines, string[] newLines, string[] oldKeys, string[] newKeys, int[,] dp, StringComparison comparison)
+    private static List<LineChange> Backtrack(string[] oldLines, string[] newLines, string[] oldKeys, string[] newKeys, int[,] dp, StringComparison comparison, int indexOffset)
     {
         var result = new List<LineChange>();
         var i = 0;
@@ -55,31 +124,31 @@ public static class LineDiffer
         {
             if (string.Equals(oldKeys[i], newKeys[j], comparison))
             {
-                result.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[j], OldIndex: i, NewIndex: j));
+                result.Add(new LineChange(ChangeType.Unchanged, oldLines[i], newLines[j], OldIndex: i + indexOffset, NewIndex: j + indexOffset));
                 i++;
                 j++;
             }
             else if (dp[i + 1, j] >= dp[i, j + 1])
             {
-                result.Add(new LineChange(ChangeType.Removed, oldLines[i], null, OldIndex: i));
+                result.Add(new LineChange(ChangeType.Removed, oldLines[i], null, OldIndex: i + indexOffset));
                 i++;
             }
             else
             {
-                result.Add(new LineChange(ChangeType.Added, null, newLines[j], NewIndex: j));
+                result.Add(new LineChange(ChangeType.Added, null, newLines[j], NewIndex: j + indexOffset));
                 j++;
             }
         }
 
         while (i < oldLines.Length)
         {
-            result.Add(new LineChange(ChangeType.Removed, oldLines[i], null, OldIndex: i));
+            result.Add(new LineChange(ChangeType.Removed, oldLines[i], null, OldIndex: i + indexOffset));
             i++;
         }
 
         while (j < newLines.Length)
         {
-            result.Add(new LineChange(ChangeType.Added, null, newLines[j], NewIndex: j));
+            result.Add(new LineChange(ChangeType.Added, null, newLines[j], NewIndex: j + indexOffset));
             j++;
         }
 

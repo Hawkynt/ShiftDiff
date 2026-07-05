@@ -7,17 +7,23 @@ public static class BlockBuilder
         var oldAnchors = AnchorDetector.Detect(oldLines);
         var newAnchors = AnchorDetector.Detect(newLines);
 
+        // Hash each line once here rather than recalling LineHasher.Hash per
+        // anchor (Detect already hashed every line internally, but doesn't
+        // expose the result) — avoids a second full-file SHA-256 pass per side.
+        var oldHashes = oldLines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
+        var newHashes = newLines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
+
         var newStrongAnchorIndicesByHash = newAnchors
             .Where(anchor => anchor.Quality == AnchorQuality.Strong)
             .ToDictionary(
-                anchor => LineHasher.Hash(anchor.Line).WhitespaceNormalized,
+                anchor => newHashes[anchor.Index],
                 anchor => anchor.Index);
 
         var rawMatchPairs = new List<(int OldIndex, int NewIndex)>();
 
         foreach (var oldAnchor in oldAnchors.Where(anchor => anchor.Quality == AnchorQuality.Strong))
         {
-            var oldHash = LineHasher.Hash(oldAnchor.Line).WhitespaceNormalized;
+            var oldHash = oldHashes[oldAnchor.Index];
 
             if (!newStrongAnchorIndicesByHash.TryGetValue(oldHash, out var newIndex) || newIndex == oldAnchor.Index)
             {
