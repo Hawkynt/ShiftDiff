@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <Authors>Hawkynt</Authors>
+    <Company>Hawkynt</Company>
+  </PropertyGroup>
+</Project>
