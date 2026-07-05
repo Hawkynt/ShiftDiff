@@ -50,6 +50,16 @@ public static class CliRunner
             return 0;
         }
 
+        if (HasMatchingExtension(oldPath, newPath, ".json"))
+        {
+            foreach (var line in JsonChangeFormatter.Format(JsonComparer.Compare(oldContent, newContent)))
+            {
+                output.WriteLine(line);
+            }
+
+            return 0;
+        }
+
         var result = FileComparer.Compare(oldContent, newContent);
         var unifiedDiffFile = UnifiedDiffBuilder.Build(result.Changes, oldPath, newPath);
 

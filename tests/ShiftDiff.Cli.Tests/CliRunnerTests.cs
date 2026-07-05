@@ -59,6 +59,25 @@ public class CliRunnerTests
     }
 
     [Fact]
+    public void Run_TwoJsonFiles_PrintsFormattedJsonChangesNotUnifiedDiff()
+    {
+        var oldPath = WriteTempFile("{\"a\":{\"key\":1,\"other\":2}}", ".json");
+        var newPath = WriteTempFile("{\"a\":{\"key\":1,\"other\":3}}", ".json");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { oldPath, newPath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        var text = output.ToString();
+        Assert.Contains("a.other: Changed 2 -> 3", text);
+        Assert.DoesNotContain("a.key", text);
+        Assert.DoesNotContain("@@", text);
+        Assert.DoesNotContain("---", text);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public void Run_NoArgs_ReturnsNonZeroAndWritesUsageToError()
     {
         AssertWrongArgCountFails(Array.Empty<string>());
