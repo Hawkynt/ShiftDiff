@@ -44,14 +44,14 @@ public class PerformanceTests
     }
 
     // Adversarial case: edits scattered across the whole file defeat prefix/
-    // suffix trimming (there's no untouched common region left), so the LCS
-    // table would need to cover ~all 100,000x100,000 cells. That's not solved
-    // by this slice — it needs a genuinely different (linear-space) diff
-    // algorithm, out of scope here. What this slice guarantees is a clear,
-    // typed failure instead of an opaque OutOfMemoryException / "array
-    // dimensions exceeded" crash.
+    // suffix trimming (there's no untouched common region left), so the exact
+    // LCS table would need to cover ~all 100,000x100,000 cells — infeasible to
+    // allocate. FR-050's degraded mode (UniqueCommonLineSynchronizer) handles
+    // this: every unedited line here is already globally unique (it embeds its
+    // own line number), so the whole file synchronizes on those lines and only
+    // the tiny gaps around each edit need the exact DP table.
     [Fact]
-    public void Compare_100000LineFilesWithScatteredEdits_ThrowsDiffTooLargeInsteadOfCrashing()
+    public void Compare_100000LineFilesWithScatteredEdits_DegradesInsteadOfThrowing()
     {
         var oldLines = GenerateLines(100_000, seed: 42);
         var newLines = ApplyScatteredEdits(oldLines, editFraction: 0.05, seed: 43);
@@ -59,11 +59,36 @@ public class PerformanceTests
         var oldContent = Encoding.UTF8.GetBytes(string.Join('\n', oldLines) + "\n");
         var newContent = Encoding.UTF8.GetBytes(string.Join('\n', newLines) + "\n");
 
-        var exception = Assert.Throws<DiffTooLargeException>(() => FileComparer.Compare(oldContent, newContent));
-        Assert.Equal(100_000, exception.OldLineCount);
-        Assert.Equal(100_000, exception.NewLineCount);
-        Assert.InRange(exception.TrimmedOldLineCount, 1, exception.OldLineCount);
-        Assert.InRange(exception.TrimmedNewLineCount, 1, exception.NewLineCount);
+        var stopwatch = Stopwatch.StartNew();
+        var result = FileComparer.Compare(oldContent, newContent);
+        stopwatch.Stop();
+
+        Assert.Contains(result.Changes, change => change.ChangeType == ChangeType.Edited);
+        Assert.True(stopwatch.ElapsedMilliseconds < 15_000,
+            $"degraded-mode regression guard, not FR-050 compliance (still open): took {stopwatch.ElapsedMilliseconds}ms");
+    }
+
+    // True worst case: no line is shared between old and new at all, so there is
+    // nothing to synchronize on. The coarsest valid result (whole file replaced)
+    // must still come back instead of an OutOfMemoryException / crash.
+    [Fact]
+    public void Compare_100000LineFilesWithNoSharedLines_ReplacesWholeFileInsteadOfCrashing()
+    {
+        // Distinct per-side prefixes guarantee zero exact-line overlap by
+        // construction, rather than relying on random content happening not to collide.
+        var oldLines = GenerateLines(100_000, seed: 42).Select(line => "OLD-" + line).ToArray();
+        var newLines = GenerateLines(100_000, seed: 99).Select(line => "NEW-" + line).ToArray();
+
+        var oldContent = Encoding.UTF8.GetBytes(string.Join('\n', oldLines) + "\n");
+        var newContent = Encoding.UTF8.GetBytes(string.Join('\n', newLines) + "\n");
+
+        var result = FileComparer.Compare(oldContent, newContent);
+
+        // Equal-length Removed/Added runs are coalesced into Edited substitution
+        // pairs by CoalesceAdjacentRemovedAndAddedIntoEdited — this is the existing,
+        // correct representation for a full-file replacement, not Removed+Added.
+        Assert.All(result.Changes, change => Assert.Equal(ChangeType.Edited, change.ChangeType));
+        Assert.Equal(100_000, result.Changes.Count());
     }
 
     private static string[] GenerateLines(int count, int seed)
