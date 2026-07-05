@@ -122,4 +122,20 @@ public class IniComparerTests
         Assert.Contains(paths, p => p.EndsWith("b.c", StringComparison.Ordinal) && !p.EndsWith("b\\.c", StringComparison.Ordinal));
         Assert.Equal(2, paths.Distinct().Count());
     }
+
+    [Fact]
+    public void Compare_BackslashInSectionCollidesWithDottedGlobalKey_ProduceDistinctPaths()
+    {
+        // Global key "a.b" escapes its dot to "a\.b". A section literally named
+        // "a\" (raw trailing backslash) followed by key "b" composes to the same
+        // "a\" + "." + "b" = "a\.b" unless the backslash itself is escaped first.
+        var changes = IniComparer.Compare(
+            Bytes(""),
+            Bytes("a.b=1\n[a\\]\nb=2\n"));
+
+        Assert.Equal(2, changes.Length);
+        Assert.All(changes, c => Assert.Equal(IniChangeType.Added, c.ChangeType));
+        var paths = changes.Select(c => c.Path).ToArray();
+        Assert.Equal(2, paths.Distinct().Count());
+    }
 }

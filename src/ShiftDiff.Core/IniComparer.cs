@@ -69,11 +69,18 @@ public static class IniComparer
 
             var key = line[..separatorIndex].Trim();
             var value = line[(separatorIndex + 1)..].Trim();
-            var escapedKey = key.Replace(".", "\\.");
-            var path = section is null ? escapedKey : $"{section.Replace(".", "\\.")}.{escapedKey}";
+            var escapedKey = EscapePathSegment(key);
+            var path = section is null ? escapedKey : $"{EscapePathSegment(section)}.{escapedKey}";
             entries[path] = value;
         }
 
         return entries;
     }
+
+    // Backslash must be escaped before dot, or a raw trailing backslash in a
+    // section name (e.g. "[a\]") composes with the inserted "." separator into
+    // the same "\." sequence a dot-escape produces, colliding with an unrelated
+    // dotted key in a different (or no) section.
+    private static string EscapePathSegment(string segment) =>
+        segment.Replace("\\", "\\\\").Replace(".", "\\.");
 }
