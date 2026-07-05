@@ -78,4 +78,31 @@ public class AnchorDetectorTests
         Assert.Equal(2, AnchorDetector.DuplicateCount(lines, 2));
         Assert.Equal(1, AnchorDetector.DuplicateCount(lines, 1));
     }
+
+    [Fact]
+    public void DuplicateCounts_matches_DuplicateCount_for_every_index()
+    {
+        var lines = new[]
+        {
+            "public static LineHash Hash(string line)",
+            "x = 1;",
+            "public   static   LineHash   Hash(string   line)",
+            "y = 2;",
+        };
+
+        var counts = AnchorDetector.DuplicateCounts(lines);
+
+        for (var index = 0; index < lines.Length; index++)
+        {
+            Assert.Equal(AnchorDetector.DuplicateCount(lines, index), counts[index]);
+        }
+    }
+
+    [Fact]
+    public void DuplicateCounts_returns_one_entry_per_input_line()
+    {
+        var lines = new[] { "a", "b", "c" };
+
+        Assert.Equal(3, AnchorDetector.DuplicateCounts(lines).Length);
+    }
 }
