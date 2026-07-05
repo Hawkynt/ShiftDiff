@@ -60,6 +60,16 @@ public static class CliRunner
             return 0;
         }
 
+        if (HasMatchingExtension(oldPath, newPath, ".xml"))
+        {
+            foreach (var line in XmlChangeFormatter.Format(XmlComparer.Compare(oldContent, newContent)))
+            {
+                output.WriteLine(line);
+            }
+
+            return 0;
+        }
+
         var result = FileComparer.Compare(oldContent, newContent);
         var unifiedDiffFile = UnifiedDiffBuilder.Build(result.Changes, oldPath, newPath);
 

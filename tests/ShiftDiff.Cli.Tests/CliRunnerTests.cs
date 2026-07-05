@@ -78,6 +78,25 @@ public class CliRunnerTests
     }
 
     [Fact]
+    public void Run_TwoXmlFiles_PrintsFormattedXmlChangesNotUnifiedDiff()
+    {
+        var oldPath = WriteTempFile("<a><key>1</key><other>2</other></a>", ".xml");
+        var newPath = WriteTempFile("<a><key>1</key><other>3</other></a>", ".xml");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { oldPath, newPath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        var text = output.ToString();
+        Assert.Contains("other: Changed 2 -> 3", text);
+        Assert.DoesNotContain("key", text);
+        Assert.DoesNotContain("@@", text);
+        Assert.DoesNotContain("---", text);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public void Run_NoArgs_ReturnsNonZeroAndWritesUsageToError()
     {
         AssertWrongArgCountFails(Array.Empty<string>());
