@@ -968,4 +968,100 @@ public class PatchApplierTests
 
         Assert.Empty(candidates);
     }
+
+    [Fact]
+    public void ApplyHunkSemantic_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var source = new[]
+        {
+            "filler line number one long enough content",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "filler line number five long enough content",
+            "block target Alpha long enough content here",
+            "block target Beta long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number eight long enough content",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => PatchApplier.ApplyHunkSemantic(source, hunk, cancellationToken: cts.Token));
+    }
+
+    [Fact]
+    public void ApplyFileSemantic_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var source = new[]
+        {
+            "block target Alpha long enough content here",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "block target Epsilon long enough content here",
+        };
+        var file = new UnifiedDiffFile(
+            new UnifiedDiffFileHeader("a/f", "b/f"),
+            new[]
+            {
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(1, 1, 1, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "block target Alpha long enough content here"),
+                        new(UnifiedDiffLineKind.Added, "block target ALPHA long enough content here"),
+                    }),
+                new UnifiedDiffHunk(
+                    new UnifiedDiffHunkHeader(5, 1, 5, 1),
+                    new UnifiedDiffLine[]
+                    {
+                        new(UnifiedDiffLineKind.Removed, "block target Epsilon long enough content here"),
+                        new(UnifiedDiffLineKind.Added, "block target EPSILON long enough content here"),
+                    }),
+            });
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => PatchApplier.ApplyFileSemantic(source, file, cancellationToken: cts.Token));
+    }
+
+    [Fact]
+    public void FindSemanticCandidates_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var source = new[]
+        {
+            "filler line number one long enough content",
+            "filler line number two long enough content",
+            "filler line number three long enough content",
+            "filler line number four long enough content",
+            "filler line number five long enough content",
+            "block target Alpha long enough content here",
+            "block target Beta long enough content here",
+            "block target Gamma long enough content here",
+            "filler line number eight long enough content",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "block target Alpha long enough content here"),
+                new(UnifiedDiffLineKind.Removed, "block target Beta long enough content here"),
+                new(UnifiedDiffLineKind.Added, "block target BETA long enough content here"),
+                new(UnifiedDiffLineKind.Context, "block target Gamma long enough content here"),
+            });
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => PatchApplier.FindSemanticCandidates(source, hunk, cancellationToken: cts.Token));
+    }
 }

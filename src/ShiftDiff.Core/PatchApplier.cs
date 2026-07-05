@@ -183,8 +183,10 @@ public static class PatchApplier
     }
 
     public static PatchApplicationResult ApplyHunkSemantic(
-        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk, DetectionMode mode = DetectionMode.Balanced)
+        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk, DetectionMode mode = DetectionMode.Balanced, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var oldLines = hunk.Lines
             .Where(line => line.Kind is UnifiedDiffLineKind.Context or UnifiedDiffLineKind.Removed)
             .ToList();
@@ -206,7 +208,7 @@ public static class PatchApplier
         var hunkOldContent = oldLines.Select(line => line.Content).ToArray();
         var sourceArray = sourceLines as string[] ?? sourceLines.ToArray();
 
-        var match = FindBestBlockMatch(hunkOldContent, sourceArray, hunk.Header.OldStart - 1, mode);
+        var match = FindBestBlockMatch(hunkOldContent, sourceArray, hunk.Header.OldStart - 1, mode, cancellationToken);
         if (match is null)
         {
             throw new PatchApplicationException(
@@ -232,8 +234,10 @@ public static class PatchApplier
     // of Core's scope. Pure insertions (no Removed/Context lines) have no
     // "location" to be ambiguous about, so they yield no candidates.
     public static IReadOnlyList<PatchApplicationCandidate> FindSemanticCandidates(
-        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk, DetectionMode mode = DetectionMode.Balanced)
+        IReadOnlyList<string> sourceLines, UnifiedDiffHunk hunk, DetectionMode mode = DetectionMode.Balanced, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var oldLines = hunk.Lines
             .Where(line => line.Kind is UnifiedDiffLineKind.Context or UnifiedDiffLineKind.Removed)
             .ToList();
@@ -245,7 +249,7 @@ public static class PatchApplier
         var hunkOldContent = oldLines.Select(line => line.Content).ToArray();
         var sourceArray = sourceLines as string[] ?? sourceLines.ToArray();
 
-        return FindBlockMatchCandidates(hunkOldContent, sourceArray, mode)
+        return FindBlockMatchCandidates(hunkOldContent, sourceArray, mode, cancellationToken)
             .OrderByDescending(candidate => candidate.Score)
             .Select(candidate => new PatchApplicationCandidate(
                 candidate.StartIndex + 1, candidate.Score, ConfidenceClassifier.Classify(candidate.Score)))
@@ -253,13 +257,14 @@ public static class PatchApplier
     }
 
     public static PatchApplicationResult ApplyFileSemantic(
-        IReadOnlyList<string> sourceLines, UnifiedDiffFile file, DetectionMode mode = DetectionMode.Balanced)
+        IReadOnlyList<string> sourceLines, UnifiedDiffFile file, DetectionMode mode = DetectionMode.Balanced, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<string> lines = sourceLines;
         var confidence = PatchApplicationConfidence.Exact;
         foreach (var hunk in file.Hunks.Reverse())
         {
-            var hunkResult = ApplyHunkSemantic(lines, hunk, mode);
+            cancellationToken.ThrowIfCancellationRequested();
+            var hunkResult = ApplyHunkSemantic(lines, hunk, mode, cancellationToken);
             lines = hunkResult.Lines;
             if (hunkResult.Confidence == PatchApplicationConfidence.Moved)
             {
@@ -288,13 +293,13 @@ public static class PatchApplier
     // candidates at all and there is no position to recover — semantic mode
     // has nothing left to try and reports no match, same as fuzzy mode does.
     private static int? FindBestBlockMatch(
-        string[] hunkOldContent, string[] sourceArray, int preferredIndex, DetectionMode mode)
+        string[] hunkOldContent, string[] sourceArray, int preferredIndex, DetectionMode mode, CancellationToken cancellationToken = default)
     {
         int? bestStartIndex = null;
         var bestScore = -1.0;
         var bestDistance = int.MaxValue;
 
-        foreach (var candidate in FindBlockMatchCandidates(hunkOldContent, sourceArray, mode))
+        foreach (var candidate in FindBlockMatchCandidates(hunkOldContent, sourceArray, mode, cancellationToken))
         {
             var distance = Math.Abs(candidate.StartIndex - preferredIndex);
             if (candidate.Score > bestScore || (candidate.Score == bestScore && distance < bestDistance))
@@ -311,8 +316,10 @@ public static class PatchApplier
     private readonly record struct BlockMatchCandidate(int StartIndex, double Score);
 
     private static List<BlockMatchCandidate> FindBlockMatchCandidates(
-        string[] hunkOldContent, string[] sourceArray, DetectionMode mode)
+        string[] hunkOldContent, string[] sourceArray, DetectionMode mode, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var results = new List<BlockMatchCandidate>();
 
         var length = hunkOldContent.Length;
@@ -324,7 +331,7 @@ public static class PatchApplier
 
         // Fragment-in-file search, not full-document comparison — see
         // BlockBuilder.Build's excludeSamePosition doc comment.
-        var candidates = BlockBuilder.Build(hunkOldContent, sourceArray, excludeSamePosition: false);
+        var candidates = BlockBuilder.Build(hunkOldContent, sourceArray, excludeSamePosition: false, cancellationToken: cancellationToken);
         if (candidates.Length == 0)
         {
             return results;
@@ -341,6 +348,7 @@ public static class PatchApplier
 
         foreach (var candidate in candidates)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var startIndex = candidate.NewStart - candidate.OldStart;
             if (startIndex < 0 || startIndex > lastPossibleStart || !consideredStartIndices.Add(startIndex))
             {
