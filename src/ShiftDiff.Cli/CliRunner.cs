@@ -11,10 +11,16 @@ public static class CliRunner
             return RunPatchMode(args[1], args[3], output, error);
         }
 
+        if (args.Length == 3)
+        {
+            return RunThreeWayMode(args[0], args[1], args[2], output, error);
+        }
+
         if (args.Length != 2)
         {
             error.WriteLine("usage: shiftdiff <old-file> <new-file>");
             error.WriteLine("       shiftdiff --patch <patch-file> --source <source-file>");
+            error.WriteLine("       shiftdiff <base-file> <local-file> <remote-file>");
             return 1;
         }
 
@@ -84,5 +90,92 @@ public static class CliRunner
         }
 
         return 0;
+    }
+
+    private static int RunThreeWayMode(
+        string basePath, string localPath, string remotePath, TextWriter output, TextWriter error)
+    {
+        string[] baseLines;
+        string[] localLines;
+        string[] remoteLines;
+        try
+        {
+            baseLines = File.ReadAllLines(basePath);
+            localLines = File.ReadAllLines(localPath);
+            remoteLines = File.ReadAllLines(remotePath);
+        }
+        catch (IOException ex)
+        {
+            error.WriteLine($"error: {ex.Message}");
+            return 1;
+        }
+
+        var changes = ThreeWayComparer.Compare(baseLines, localLines, remoteLines);
+        var conflictCount = 0;
+        var i = 0;
+        while (i < changes.Length)
+        {
+            if (changes[i].ChangeType != ChangeType.Conflict)
+            {
+                WriteResolvedLine(changes[i], output);
+                i++;
+                continue;
+            }
+
+            conflictCount++;
+            var localBlock = new List<string>();
+            var remoteBlock = new List<string>();
+            while (i < changes.Length && changes[i].ChangeType == ChangeType.Conflict)
+            {
+                if (changes[i].LocalLine is not null)
+                {
+                    localBlock.Add(changes[i].LocalLine!);
+                }
+
+                if (changes[i].RemoteLine is not null)
+                {
+                    remoteBlock.Add(changes[i].RemoteLine!);
+                }
+
+                i++;
+            }
+
+            output.WriteLine("<<<<<<< local");
+            foreach (var line in localBlock)
+            {
+                output.WriteLine(line);
+            }
+
+            output.WriteLine("=======");
+            foreach (var line in remoteBlock)
+            {
+                output.WriteLine(line);
+            }
+
+            output.WriteLine(">>>>>>> remote");
+        }
+
+        if (conflictCount > 0)
+        {
+            error.WriteLine($"{conflictCount} conflict(s) require resolution");
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private static void WriteResolvedLine(ThreeWayChange change, TextWriter output)
+    {
+        switch (change.ChangeType)
+        {
+            case ChangeType.Removed:
+                break;
+            case ChangeType.Unchanged:
+                output.WriteLine(change.BaseLine!);
+                break;
+            default:
+                output.WriteLine(change.LocalLine ?? change.RemoteLine!);
+                break;
+        }
     }
 }
