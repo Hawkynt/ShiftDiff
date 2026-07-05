@@ -105,4 +105,15 @@ public class BlockBuilderTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public void Build_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var oldLines = new[] { "public static LineHash Hash(string line)", "x = 1;" };
+        var newLines = new[] { "x = 1;", "public static LineHash Hash(string line)" };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => BlockBuilder.Build(oldLines, newLines, cancellationToken: cts.Token));
+    }
 }

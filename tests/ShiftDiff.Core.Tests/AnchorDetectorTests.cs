@@ -122,4 +122,24 @@ public class AnchorDetectorTests
         Assert.Equal(AnchorDetector.Detect(lines), anchors);
         Assert.Equal(AnchorDetector.DuplicateCounts(lines), counts);
     }
+
+    [Fact]
+    public void Detect_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var lines = new[] { "public static LineHash Hash(string line)", "x = 1;" };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => AnchorDetector.Detect(lines, cts.Token));
+    }
+
+    [Fact]
+    public void DetectWithDuplicateCounts_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var lines = new[] { "public static LineHash Hash(string line)", "x = 1;" };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => AnchorDetector.DetectWithDuplicateCounts(lines, cts.Token));
+    }
 }

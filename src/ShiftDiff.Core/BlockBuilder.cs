@@ -12,10 +12,12 @@ public static class BlockBuilder
     // coincidence, not evidence the content "didn't move" — excluding it
     // there silently dropped the only valid candidate for any single-line
     // hunk whose target happened to sit at that source index.
-    public static BlockCandidate[] Build(string[] oldLines, string[] newLines, bool excludeSamePosition = true)
+    public static BlockCandidate[] Build(string[] oldLines, string[] newLines, bool excludeSamePosition = true, CancellationToken cancellationToken = default)
     {
-        var oldAnchors = AnchorDetector.Detect(oldLines);
-        var newAnchors = AnchorDetector.Detect(newLines);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var oldAnchors = AnchorDetector.Detect(oldLines, cancellationToken);
+        var newAnchors = AnchorDetector.Detect(newLines, cancellationToken);
 
         // Hash each line once here rather than recalling LineHasher.Hash per
         // anchor (Detect already hashed every line internally, but doesn't

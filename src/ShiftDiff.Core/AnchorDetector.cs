@@ -23,15 +23,17 @@ public static class AnchorDetector
         return hashes.Select(hash => counts[hash]).ToArray();
     }
 
-    public static LineAnchor[] Detect(string[] lines) => DetectWithDuplicateCounts(lines).Anchors;
+    public static LineAnchor[] Detect(string[] lines, CancellationToken cancellationToken = default) => DetectWithDuplicateCounts(lines, cancellationToken).Anchors;
 
     /// <summary>
     /// Combined form of <see cref="Detect"/> and <see cref="DuplicateCounts"/> — callers that need
     /// both (e.g. <see cref="BlockClassifier.Classify"/>) previously hashed every line twice, once
     /// per method. This computes the hash pass exactly once and derives both results from it.
     /// </summary>
-    public static (LineAnchor[] Anchors, int[] DuplicateCounts) DetectWithDuplicateCounts(string[] lines)
+    public static (LineAnchor[] Anchors, int[] DuplicateCounts) DetectWithDuplicateCounts(string[] lines, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var lineHashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
         var whitespaceNormalizedCounts = lineHashes
             .GroupBy(hash => hash)
@@ -42,6 +44,7 @@ public static class AnchorDetector
 
         for (var index = 0; index < lines.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             anchors[index] = new LineAnchor(index, lines[index], ClassifyLine(lines[index], lineHashes[index], whitespaceNormalizedCounts));
             duplicateCounts[index] = whitespaceNormalizedCounts[lineHashes[index]];
         }
