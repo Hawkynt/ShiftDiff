@@ -222,4 +222,40 @@ public class XmlComparerTests
         Assert.Equal("b/@x", change.Path);
         Assert.Equal(XmlChangeType.Unchanged, change.ChangeType);
     }
+
+    [Fact]
+    public void Compare_BothSidesMalformed_FallsBackToRawTextComparison()
+    {
+        var changes = XmlComparer.Compare(
+            "<not xml"u8.ToArray(),
+            "<also not xml"u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_OneSideMalformed_FallsBackToRawTextComparison()
+    {
+        var changes = XmlComparer.Compare(
+            """<a b="1"/>"""u8.ToArray(),
+            "<not xml"u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_BothSidesMalformed_IdenticalRawText_MarksUnchanged()
+    {
+        var changes = XmlComparer.Compare(
+            "<not xml"u8.ToArray(),
+            "<not xml"u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(XmlChangeType.Unchanged, change.ChangeType);
+    }
 }

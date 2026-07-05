@@ -1,4 +1,5 @@
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace ShiftDiff.Core;
@@ -17,8 +18,19 @@ public static class XmlComparer
 {
     public static XmlChange[] Compare(byte[] baseXml, byte[] targetXml)
     {
-        var baseRoot = XDocument.Parse(Encoding.UTF8.GetString(baseXml)).Root!;
-        var targetRoot = XDocument.Parse(Encoding.UTF8.GetString(targetXml)).Root!;
+        XElement baseRoot;
+        XElement targetRoot;
+        try
+        {
+            baseRoot = XDocument.Parse(Encoding.UTF8.GetString(baseXml)).Root!;
+            targetRoot = XDocument.Parse(Encoding.UTF8.GetString(targetXml)).Root!;
+        }
+        catch (XmlException)
+        {
+            var oldRawText = Encoding.UTF8.GetString(baseXml);
+            var newRawText = Encoding.UTF8.GetString(targetXml);
+            return [new XmlChange(null, oldRawText == newRawText ? XmlChangeType.Unchanged : XmlChangeType.Changed, oldRawText, newRawText)];
+        }
 
         var changes = new List<XmlChange>();
         CompareElements(baseRoot, targetRoot, path: null, changes);
