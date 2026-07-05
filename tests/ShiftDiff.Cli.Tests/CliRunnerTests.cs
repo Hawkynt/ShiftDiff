@@ -1,0 +1,88 @@
+using ShiftDiff.Cli;
+using Xunit;
+
+namespace ShiftDiff.Cli.Tests;
+
+public class CliRunnerTests
+{
+    [Fact]
+    public void Run_TwoIdenticalFiles_ReturnsZeroAndPrintsHeaderWithNoHunks()
+    {
+        var oldPath = WriteTempFile("one\ntwo\nthree\n");
+        var newPath = WriteTempFile("one\ntwo\nthree\n");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { oldPath, newPath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains($"--- {oldPath}", output.ToString());
+        Assert.Contains($"+++ {newPath}", output.ToString());
+        Assert.DoesNotContain("@@", output.ToString());
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
+    public void Run_TwoDifferentFiles_PrintsUnifiedDiffHunk()
+    {
+        var oldPath = WriteTempFile("one\ntwo\nthree\n");
+        var newPath = WriteTempFile("one\nTWO\nthree\n");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { oldPath, newPath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        var text = output.ToString();
+        Assert.Contains("@@", text);
+        Assert.Contains("-two", text);
+        Assert.Contains("+TWO", text);
+    }
+
+    [Fact]
+    public void Run_NoArgs_ReturnsNonZeroAndWritesUsageToError()
+    {
+        AssertWrongArgCountFails(Array.Empty<string>());
+    }
+
+    [Fact]
+    public void Run_OneArg_ReturnsNonZeroAndWritesUsageToError()
+    {
+        AssertWrongArgCountFails(new[] { "only-one-arg" });
+    }
+
+    private static void AssertWrongArgCountFails(string[] args)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(args, output, error);
+
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains("usage", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, output.ToString());
+    }
+
+    [Fact]
+    public void Run_MissingFile_ReturnsNonZeroWithFriendlyErrorNotStackTrace()
+    {
+        var newPath = WriteTempFile("one\n");
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+
+        var exitCode = CliRunner.Run(new[] { missingPath, newPath }, output, error);
+
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains(missingPath, error.ToString());
+        Assert.DoesNotContain("StackTrace", error.ToString());
+        Assert.Equal(string.Empty, output.ToString());
+    }
+
+    private static string WriteTempFile(string content)
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+        File.WriteAllText(path, content);
+        return path;
+    }
+}
