@@ -138,4 +138,18 @@ public class IniComparerTests
         var paths = changes.Select(c => c.Path).ToArray();
         Assert.Equal(2, paths.Distinct().Count());
     }
+
+    [Fact]
+    public void Compare_MalformedLineWithNoEqualsSign_IsSilentlyIgnored()
+    {
+        var changes = IniComparer.Compare(
+            Bytes("[a]\nkey=1\njustnoise\n"),
+            Bytes("[a]\nkey=2\njustnoise\n"));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("a.key", change.Path);
+        Assert.Equal(IniChangeType.Changed, change.ChangeType);
+        Assert.Equal("1", change.OldValue);
+        Assert.Equal("2", change.NewValue);
+    }
 }
