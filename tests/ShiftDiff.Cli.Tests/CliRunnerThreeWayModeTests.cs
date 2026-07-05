@@ -65,6 +65,22 @@ public class CliRunnerThreeWayModeTests
     }
 
     [Fact]
+    public void Run_ThreeWayMode_BothSidesDeleteSameLine_DropsLineFromResolvedOutputWithZeroExit()
+    {
+        var basePath = WriteTempFile("a\nb\nc\n");
+        var localPath = WriteTempFile("a\nc\n");
+        var remotePath = WriteTempFile("a\nc\n");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { basePath, localPath, remotePath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal($"a{Environment.NewLine}c{Environment.NewLine}", output.ToString());
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public void Run_ThreeWayMode_MissingFile_ReturnsNonZeroWithFriendlyError()
     {
         var localPath = WriteTempFile("one\n");

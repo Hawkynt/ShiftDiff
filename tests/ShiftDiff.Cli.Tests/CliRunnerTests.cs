@@ -202,6 +202,24 @@ public class CliRunnerTests
         Assert.Equal(string.Empty, output.ToString());
     }
 
+    [Fact]
+    public void Run_PatchModeEmptyPatchFile_ReturnsNonZeroWithFriendlyError()
+    {
+        var sourcePath = WriteTempFile("one\n");
+        var emptyPatchPath = WriteTempFile("", ".patch");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(
+            new[] { "--patch", emptyPatchPath, "--source", sourcePath },
+            output,
+            error);
+
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains("no file entries", error.ToString());
+        Assert.Equal(string.Empty, output.ToString());
+    }
+
     private static string WriteTempFile(string content) => WriteTempFile(content, ".txt");
 
     private static string WriteTempFile(string content, string extension)
