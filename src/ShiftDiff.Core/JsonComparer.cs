@@ -10,7 +10,7 @@ public enum JsonChangeType
     Unchanged,
 }
 
-public sealed record JsonChange(string Path, JsonChangeType ChangeType, string? OldValue = null, string? NewValue = null);
+public sealed record JsonChange(string? Path, JsonChangeType ChangeType, string? OldValue = null, string? NewValue = null);
 
 public static class JsonComparer
 {
@@ -20,8 +20,21 @@ public static class JsonComparer
         using var targetDocument = JsonDocument.Parse(targetJson);
 
         var changes = new List<JsonChange>();
-        CompareObjects(baseDocument.RootElement, targetDocument.RootElement, path: null, changes);
+        CompareValues(baseDocument.RootElement, targetDocument.RootElement, path: null, changes);
         return changes.ToArray();
+    }
+
+    private static void CompareValues(JsonElement baseValue, JsonElement targetValue, string? path, List<JsonChange> changes)
+    {
+        if (baseValue.ValueKind == JsonValueKind.Object && targetValue.ValueKind == JsonValueKind.Object)
+        {
+            CompareObjects(baseValue, targetValue, path, changes);
+            return;
+        }
+
+        var oldRawValue = baseValue.GetRawText();
+        var newRawValue = targetValue.GetRawText();
+        changes.Add(new JsonChange(path, oldRawValue == newRawValue ? JsonChangeType.Unchanged : JsonChangeType.Changed, oldRawValue, newRawValue));
     }
 
     private static void CompareObjects(JsonElement baseObject, JsonElement targetObject, string? path, List<JsonChange> changes)

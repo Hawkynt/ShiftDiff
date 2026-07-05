@@ -135,4 +135,52 @@ public class JsonComparerTests
         Assert.Equal("""{"x":1}""", change.OldValue!.Replace(" ", ""));
         Assert.Equal("1", change.NewValue);
     }
+
+    [Fact]
+    public void Compare_ArrayValue_Identical_MarksUnchanged()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("""{"a": [1, 2, 3]}"""),
+            Bytes("""{"a": [1, 2, 3]}"""));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("a", change.Path);
+        Assert.Equal(JsonChangeType.Unchanged, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_ArrayValue_ElementChanged_MarksChangedAsWholeArray()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("""{"a": [1, 2, 3]}"""),
+            Bytes("""{"a": [1, 9, 3]}"""));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("a", change.Path);
+        Assert.Equal(JsonChangeType.Changed, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_ArrayValue_ElementsReordered_MarksChanged()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("""{"a": [1, 2, 3]}"""),
+            Bytes("""{"a": [3, 2, 1]}"""));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("a", change.Path);
+        Assert.Equal(JsonChangeType.Changed, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_NonObjectRoot_ScalarArray_ComparedAsSingleValue()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("[1, 2, 3]"),
+            Bytes("[1, 9, 3]"));
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(JsonChangeType.Changed, change.ChangeType);
+    }
 }
