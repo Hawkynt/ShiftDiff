@@ -656,6 +656,32 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void Semantic_HunkOldContentLongerThanEntireSource_ThrowsPatchApplicationException()
+    {
+        // The hunk's total old-line count (Context+Removed) exceeds the
+        // entire source array's length — the file has been truncated
+        // shorter than the patch expects. Distinct from
+        // Semantic_HunkTooShortToFormAStrongAnchor above: that case has a
+        // long-enough source but a too-short anchor; this case can never
+        // fit in the source at all, regardless of anchor length.
+        var source = new[]
+        {
+            "line one long enough content here for anchor purposes",
+            "line two long enough content here for anchor purposes",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "line one long enough content here for anchor purposes"),
+                new(UnifiedDiffLineKind.Removed, "line two long enough content here for anchor purposes"),
+                new(UnifiedDiffLineKind.Context, "line three long enough content here for anchor purposes"),
+            });
+
+        Assert.Throws<PatchApplicationException>(() => PatchApplier.ApplyHunkSemantic(source, hunk));
+    }
+
+    [Fact]
     public void Semantic_PureInsertionHunkWithNoOldLines_AppliesAtRecordedPositionAsExact()
     {
         // Counterpart to Fuzzy_PureInsertionHunkWithNoOldLines above — this
