@@ -97,6 +97,24 @@ public class CliRunnerTests
     }
 
     [Fact]
+    public void Run_TwoMarkdownFiles_PrintsFormattedMarkdownChangesNotUnifiedDiff()
+    {
+        var oldPath = WriteTempFile("# Old\ncontent\n", ".md");
+        var newPath = WriteTempFile("# New\ncontent\n", ".md");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { oldPath, newPath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        var text = output.ToString();
+        Assert.Contains("# New: Moved (from # Old)", text);
+        Assert.DoesNotContain("@@", text);
+        Assert.DoesNotContain("---", text);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public void Run_NoArgs_ReturnsNonZeroAndWritesUsageToError()
     {
         AssertWrongArgCountFails(Array.Empty<string>());

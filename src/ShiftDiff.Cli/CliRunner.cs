@@ -70,6 +70,17 @@ public static class CliRunner
             return 0;
         }
 
+        if (HasMatchingExtension(oldPath, newPath, ".md"))
+        {
+            var markdownChanges = MarkdownMoveDetector.Detect(MarkdownComparer.Compare(oldContent, newContent));
+            foreach (var line in MarkdownChangeFormatter.Format(markdownChanges))
+            {
+                output.WriteLine(line);
+            }
+
+            return 0;
+        }
+
         var result = FileComparer.Compare(oldContent, newContent);
         var unifiedDiffFile = UnifiedDiffBuilder.Build(result.Changes, oldPath, newPath);
 
