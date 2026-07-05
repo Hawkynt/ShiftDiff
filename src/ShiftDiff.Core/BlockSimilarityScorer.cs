@@ -11,17 +11,27 @@ public static class BlockSimilarityScorer
     public static int TokenCount(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
         TokenizeRange(oldLines, candidate.OldStart, candidate.OldEnd).Count;
 
-    public static double ExactHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    public static double ExactHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        ExactHashOverlapFromHashes(
+            candidate,
+            oldLines.Select(LineHasher.HashRaw).ToArray(),
+            newLines.Select(LineHasher.HashRaw).ToArray());
+
+    /// <summary>
+    /// Variant of <see cref="ExactHashOverlap(BlockCandidate, string[], string[])"/> taking already-computed
+    /// raw-line hashes for the whole file — avoids re-hashing every line once per candidate when a caller
+    /// (e.g. <see cref="BlockClassifier.Classify"/>) scores many candidates against the same fixed
+    /// oldLines/newLines. Named rather than overloaded because a same-signature overload distinguished only
+    /// by parameter name (string[] hashes vs. string[] lines) is not valid C#.
+    /// </summary>
+    public static double ExactHashOverlapFromHashes(BlockCandidate candidate, string[] oldHashesRaw, string[] newHashesRaw)
     {
         var lineCount = candidate.OldEnd - candidate.OldStart + 1;
         var matchingLines = 0;
 
         for (var offset = 0; offset < lineCount; offset++)
         {
-            var oldHash = LineHasher.HashRaw(oldLines[candidate.OldStart + offset]);
-            var newHash = LineHasher.HashRaw(newLines[candidate.NewStart + offset]);
-
-            if (oldHash == newHash)
+            if (oldHashesRaw[candidate.OldStart + offset] == newHashesRaw[candidate.NewStart + offset])
             {
                 matchingLines++;
             }
@@ -30,17 +40,21 @@ public static class BlockSimilarityScorer
         return matchingLines / (double)lineCount;
     }
 
-    public static double NormalizedHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    public static double NormalizedHashOverlap(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        NormalizedHashOverlapFromHashes(
+            candidate,
+            oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray(),
+            newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray());
+
+    /// <summary>See <see cref="ExactHashOverlapFromHashes"/> — whitespace-normalized tier only.</summary>
+    public static double NormalizedHashOverlapFromHashes(BlockCandidate candidate, string[] oldHashesNormalized, string[] newHashesNormalized)
     {
         var lineCount = candidate.OldEnd - candidate.OldStart + 1;
         var matchingLines = 0;
 
         for (var offset = 0; offset < lineCount; offset++)
         {
-            var oldHash = LineHasher.HashWhitespaceNormalized(oldLines[candidate.OldStart + offset]);
-            var newHash = LineHasher.HashWhitespaceNormalized(newLines[candidate.NewStart + offset]);
-
-            if (oldHash == newHash)
+            if (oldHashesNormalized[candidate.OldStart + offset] == newHashesNormalized[candidate.NewStart + offset])
             {
                 matchingLines++;
             }
@@ -98,10 +112,17 @@ public static class BlockSimilarityScorer
         return minLineCount / (double)maxLineCount;
     }
 
-    public static double OrderingConsistency(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    public static double OrderingConsistency(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        OrderingConsistencyFromHashes(
+            candidate,
+            oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray(),
+            newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray());
+
+    /// <summary>See <see cref="ExactHashOverlapFromHashes"/> — same precomputed-array rationale.</summary>
+    public static double OrderingConsistencyFromHashes(BlockCandidate candidate, string[] oldHashesNormalized, string[] newHashesNormalized)
     {
-        var oldHashes = HashRange(oldLines, candidate.OldStart, candidate.OldEnd);
-        var newHashes = HashRange(newLines, candidate.NewStart, candidate.NewEnd);
+        var oldHashes = oldHashesNormalized[candidate.OldStart..(candidate.OldEnd + 1)];
+        var newHashes = newHashesNormalized[candidate.NewStart..(candidate.NewEnd + 1)];
 
         var oldHashCounts = oldHashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
         var newHashCounts = newHashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
@@ -143,18 +164,6 @@ public static class BlockSimilarityScorer
         return concordantPairs / (double)totalPairs;
     }
 
-    private static string[] HashRange(string[] lines, int start, int end)
-    {
-        var hashes = new string[end - start + 1];
-
-        for (var offset = 0; offset < hashes.Length; offset++)
-        {
-            hashes[offset] = LineHasher.HashWhitespaceNormalized(lines[start + offset]);
-        }
-
-        return hashes;
-    }
-
     public static double RarityWeightedAnchorScore(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
         RarityWeightedAnchorScore(candidate, AnchorDetector.Detect(oldLines), AnchorDetector.Detect(newLines));
 
@@ -187,7 +196,14 @@ public static class BlockSimilarityScorer
         return strongCount / (double)count;
     }
 
-    public static double NeighboringBlockConsistency(BlockCandidate candidate, string[] oldLines, string[] newLines)
+    public static double NeighboringBlockConsistency(BlockCandidate candidate, string[] oldLines, string[] newLines) =>
+        NeighboringBlockConsistencyFromHashes(
+            candidate,
+            oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray(),
+            newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray());
+
+    /// <summary>See <see cref="ExactHashOverlapFromHashes"/> — same precomputed-array rationale.</summary>
+    public static double NeighboringBlockConsistencyFromHashes(BlockCandidate candidate, string[] oldHashesNormalized, string[] newHashesNormalized)
     {
         var comparableCount = 0;
         var matchingCount = 0;
@@ -195,22 +211,18 @@ public static class BlockSimilarityScorer
         if (candidate.OldStart > 0 && candidate.NewStart > 0)
         {
             comparableCount++;
-            var oldHash = LineHasher.HashWhitespaceNormalized(oldLines[candidate.OldStart - 1]);
-            var newHash = LineHasher.HashWhitespaceNormalized(newLines[candidate.NewStart - 1]);
 
-            if (oldHash == newHash)
+            if (oldHashesNormalized[candidate.OldStart - 1] == newHashesNormalized[candidate.NewStart - 1])
             {
                 matchingCount++;
             }
         }
 
-        if (candidate.OldEnd < oldLines.Length - 1 && candidate.NewEnd < newLines.Length - 1)
+        if (candidate.OldEnd < oldHashesNormalized.Length - 1 && candidate.NewEnd < newHashesNormalized.Length - 1)
         {
             comparableCount++;
-            var oldHash = LineHasher.HashWhitespaceNormalized(oldLines[candidate.OldEnd + 1]);
-            var newHash = LineHasher.HashWhitespaceNormalized(newLines[candidate.NewEnd + 1]);
 
-            if (oldHash == newHash)
+            if (oldHashesNormalized[candidate.OldEnd + 1] == newHashesNormalized[candidate.NewEnd + 1])
             {
                 matchingCount++;
             }
@@ -230,15 +242,50 @@ public static class BlockSimilarityScorer
     /// <summary>
     /// Overload taking already-computed anchors — see <see cref="RarityWeightedAnchorScore(BlockCandidate, LineAnchor[], LineAnchor[])"/>.
     /// </summary>
-    public static double CombinedScore(BlockCandidate candidate, string[] oldLines, string[] newLines, LineAnchor[] oldAnchors, LineAnchor[] newAnchors) =>
-        (ExactHashOverlap(candidate, oldLines, newLines)
-         + NormalizedHashOverlap(candidate, oldLines, newLines)
+    public static double CombinedScore(BlockCandidate candidate, string[] oldLines, string[] newLines, LineAnchor[] oldAnchors, LineAnchor[] newAnchors)
+    {
+        var oldHashesRaw = oldLines.Select(LineHasher.HashRaw).ToArray();
+        var newHashesRaw = newLines.Select(LineHasher.HashRaw).ToArray();
+        var oldHashesNormalized = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+
+        return CombinedScore(
+            candidate,
+            oldLines,
+            newLines,
+            oldHashesRaw,
+            newHashesRaw,
+            oldHashesNormalized,
+            newHashesNormalized,
+            oldAnchors,
+            newAnchors);
+    }
+
+    /// <summary>
+    /// Fully precomputed overload — combines the anchor precompute above with precomputed raw and
+    /// whitespace-normalized hash arrays for the whole file, so a caller scoring many candidates against
+    /// the same fixed oldLines/newLines (e.g. <see cref="BlockClassifier.Classify"/>) hashes each line once
+    /// instead of once per candidate. TokenShingleSimilarity/SimHashSimilarity/BlockSizeRatio are
+    /// tokenize-based rather than hash-based and still take oldLines/newLines directly.
+    /// </summary>
+    public static double CombinedScore(
+        BlockCandidate candidate,
+        string[] oldLines,
+        string[] newLines,
+        string[] oldHashesRaw,
+        string[] newHashesRaw,
+        string[] oldHashesNormalized,
+        string[] newHashesNormalized,
+        LineAnchor[] oldAnchors,
+        LineAnchor[] newAnchors) =>
+        (ExactHashOverlapFromHashes(candidate, oldHashesRaw, newHashesRaw)
+         + NormalizedHashOverlapFromHashes(candidate, oldHashesNormalized, newHashesNormalized)
          + TokenShingleSimilarity(candidate, oldLines, newLines)
          + SimHashSimilarity(candidate, oldLines, newLines)
          + BlockSizeRatio(candidate, oldLines, newLines)
-         + OrderingConsistency(candidate, oldLines, newLines)
+         + OrderingConsistencyFromHashes(candidate, oldHashesNormalized, newHashesNormalized)
          + RarityWeightedAnchorScore(candidate, oldAnchors, newAnchors)
-         + NeighboringBlockConsistency(candidate, oldLines, newLines)) / 8.0;
+         + NeighboringBlockConsistencyFromHashes(candidate, oldHashesNormalized, newHashesNormalized)) / 8.0;
 
     private static List<string> Tokenize(string line)
     {

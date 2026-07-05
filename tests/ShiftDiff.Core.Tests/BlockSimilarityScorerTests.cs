@@ -1,3 +1,4 @@
+using System.Linq;
 using ShiftDiff.Core;
 using Xunit;
 
@@ -637,6 +638,124 @@ public class BlockSimilarityScorerTests
 
         var expected = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines);
         var actual = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines, oldAnchors, newAnchors);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void ExactHashOverlap_WithPrecomputedHashes_MatchesTheScanningOverload()
+    {
+        var oldLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "block line Alpha long enough content",
+            "changed block line Beta content",
+            "block line Gamma long enough content",
+        };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+        var oldHashesRaw = oldLines.Select(LineHasher.HashRaw).ToArray();
+        var newHashesRaw = newLines.Select(LineHasher.HashRaw).ToArray();
+
+        var expected = BlockSimilarityScorer.ExactHashOverlap(candidate, oldLines, newLines);
+        var actual = BlockSimilarityScorer.ExactHashOverlapFromHashes(candidate, oldHashesRaw, newHashesRaw);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void NormalizedHashOverlap_WithPrecomputedHashes_MatchesTheScanningOverload()
+    {
+        var oldLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line   Beta    long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+        var oldHashesNormalized = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+
+        var expected = BlockSimilarityScorer.NormalizedHashOverlap(candidate, oldLines, newLines);
+        var actual = BlockSimilarityScorer.NormalizedHashOverlapFromHashes(candidate, oldHashesNormalized, newHashesNormalized);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void OrderingConsistency_WithPrecomputedHashes_MatchesTheScanningOverload()
+    {
+        var oldLines = new[] { "alpha", "beta", "gamma", "delta" };
+        var newLines = new[] { "alpha", "gamma", "beta", "delta" };
+        var candidate = new BlockCandidate(0, 3, 0, 3);
+        var oldHashesNormalized = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+
+        var expected = BlockSimilarityScorer.OrderingConsistency(candidate, oldLines, newLines);
+        var actual = BlockSimilarityScorer.OrderingConsistencyFromHashes(candidate, oldHashesNormalized, newHashesNormalized);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void NeighboringBlockConsistency_WithPrecomputedHashes_MatchesTheScanningOverload()
+    {
+        var oldLines = new[] { "match before", "A", "B", "mismatch after old" };
+        var newLines = new[] { "match before", "A", "B", "mismatch after new" };
+        var candidate = new BlockCandidate(1, 2, 1, 2);
+        var oldHashesNormalized = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+
+        var expected = BlockSimilarityScorer.NeighboringBlockConsistency(candidate, oldLines, newLines);
+        var actual = BlockSimilarityScorer.NeighboringBlockConsistencyFromHashes(candidate, oldHashesNormalized, newHashesNormalized);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void CombinedScore_WithPrecomputedHashes_MatchesTheScanningOverload()
+    {
+        var oldLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var newLines = new[]
+        {
+            "block line Alpha long enough content",
+            "block line Beta long enough content",
+            "block line Gamma long enough content",
+        };
+        var candidate = new BlockCandidate(0, 2, 0, 2);
+        var oldAnchors = AnchorDetector.Detect(oldLines);
+        var newAnchors = AnchorDetector.Detect(newLines);
+        var oldHashesRaw = oldLines.Select(LineHasher.HashRaw).ToArray();
+        var newHashesRaw = newLines.Select(LineHasher.HashRaw).ToArray();
+        var oldHashesNormalized = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashesNormalized = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+
+        var expected = BlockSimilarityScorer.CombinedScore(candidate, oldLines, newLines);
+        var actual = BlockSimilarityScorer.CombinedScore(
+            candidate,
+            oldLines,
+            newLines,
+            oldHashesRaw,
+            newHashesRaw,
+            oldHashesNormalized,
+            newHashesNormalized,
+            oldAnchors,
+            newAnchors);
 
         Assert.Equal(expected, actual);
     }
