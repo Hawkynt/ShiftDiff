@@ -10,8 +10,8 @@ public static class BlockBuilder
         // Hash each line once here rather than recalling LineHasher.Hash per
         // anchor (Detect already hashed every line internally, but doesn't
         // expose the result) — avoids a second full-file SHA-256 pass per side.
-        var oldHashes = oldLines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
-        var newHashes = newLines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
+        var oldHashes = oldLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+        var newHashes = newLines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
 
         var newStrongAnchorIndicesByHash = newAnchors
             .Where(anchor => anchor.Quality == AnchorQuality.Strong)

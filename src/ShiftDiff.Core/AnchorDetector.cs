@@ -6,8 +6,8 @@ public static class AnchorDetector
 {
     public static int DuplicateCount(string[] lines, int index)
     {
-        var targetHash = LineHasher.Hash(lines[index]).WhitespaceNormalized;
-        return lines.Count(line => LineHasher.Hash(line).WhitespaceNormalized == targetHash);
+        var targetHash = LineHasher.HashWhitespaceNormalized(lines[index]);
+        return lines.Count(line => LineHasher.HashWhitespaceNormalized(line) == targetHash);
     }
 
     /// <summary>
@@ -17,7 +17,7 @@ public static class AnchorDetector
     /// </summary>
     public static int[] DuplicateCounts(string[] lines)
     {
-        var hashes = lines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
+        var hashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
         var counts = hashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
 
         return hashes.Select(hash => counts[hash]).ToArray();
@@ -32,7 +32,7 @@ public static class AnchorDetector
     /// </summary>
     public static (LineAnchor[] Anchors, int[] DuplicateCounts) DetectWithDuplicateCounts(string[] lines)
     {
-        var lineHashes = lines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
+        var lineHashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
         var whitespaceNormalizedCounts = lineHashes
             .GroupBy(hash => hash)
             .ToDictionary(group => group.Key, group => group.Count());

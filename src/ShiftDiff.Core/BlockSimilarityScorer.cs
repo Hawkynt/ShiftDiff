@@ -18,8 +18,8 @@ public static class BlockSimilarityScorer
 
         for (var offset = 0; offset < lineCount; offset++)
         {
-            var oldHash = LineHasher.Hash(oldLines[candidate.OldStart + offset]).Raw;
-            var newHash = LineHasher.Hash(newLines[candidate.NewStart + offset]).Raw;
+            var oldHash = LineHasher.HashRaw(oldLines[candidate.OldStart + offset]);
+            var newHash = LineHasher.HashRaw(newLines[candidate.NewStart + offset]);
 
             if (oldHash == newHash)
             {
@@ -37,8 +37,8 @@ public static class BlockSimilarityScorer
 
         for (var offset = 0; offset < lineCount; offset++)
         {
-            var oldHash = LineHasher.Hash(oldLines[candidate.OldStart + offset]).WhitespaceNormalized;
-            var newHash = LineHasher.Hash(newLines[candidate.NewStart + offset]).WhitespaceNormalized;
+            var oldHash = LineHasher.HashWhitespaceNormalized(oldLines[candidate.OldStart + offset]);
+            var newHash = LineHasher.HashWhitespaceNormalized(newLines[candidate.NewStart + offset]);
 
             if (oldHash == newHash)
             {
@@ -149,7 +149,7 @@ public static class BlockSimilarityScorer
 
         for (var offset = 0; offset < hashes.Length; offset++)
         {
-            hashes[offset] = LineHasher.Hash(lines[start + offset]).WhitespaceNormalized;
+            hashes[offset] = LineHasher.HashWhitespaceNormalized(lines[start + offset]);
         }
 
         return hashes;
@@ -195,8 +195,8 @@ public static class BlockSimilarityScorer
         if (candidate.OldStart > 0 && candidate.NewStart > 0)
         {
             comparableCount++;
-            var oldHash = LineHasher.Hash(oldLines[candidate.OldStart - 1]).WhitespaceNormalized;
-            var newHash = LineHasher.Hash(newLines[candidate.NewStart - 1]).WhitespaceNormalized;
+            var oldHash = LineHasher.HashWhitespaceNormalized(oldLines[candidate.OldStart - 1]);
+            var newHash = LineHasher.HashWhitespaceNormalized(newLines[candidate.NewStart - 1]);
 
             if (oldHash == newHash)
             {
@@ -207,8 +207,8 @@ public static class BlockSimilarityScorer
         if (candidate.OldEnd < oldLines.Length - 1 && candidate.NewEnd < newLines.Length - 1)
         {
             comparableCount++;
-            var oldHash = LineHasher.Hash(oldLines[candidate.OldEnd + 1]).WhitespaceNormalized;
-            var newHash = LineHasher.Hash(newLines[candidate.NewEnd + 1]).WhitespaceNormalized;
+            var oldHash = LineHasher.HashWhitespaceNormalized(oldLines[candidate.OldEnd + 1]);
+            var newHash = LineHasher.HashWhitespaceNormalized(newLines[candidate.NewEnd + 1]);
 
             if (oldHash == newHash)
             {

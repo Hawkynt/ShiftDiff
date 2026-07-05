@@ -49,4 +49,24 @@ public class LineHasherTests
         Assert.NotEqual(spaced.Raw, joined.Raw);
         Assert.NotEqual(spaced.Trimmed, joined.Trimmed);
     }
+
+    [Theory]
+    [InlineData("foo bar")]
+    [InlineData("  foo  ")]
+    [InlineData("foo   bar")]
+    [InlineData("")]
+    public void HashRaw_MatchesRawTierOfFullHash(string line)
+    {
+        Assert.Equal(LineHasher.Hash(line).Raw, LineHasher.HashRaw(line));
+    }
+
+    [Theory]
+    [InlineData("foo bar")]
+    [InlineData("  foo  ")]
+    [InlineData("foo   bar")]
+    [InlineData("")]
+    public void HashWhitespaceNormalized_MatchesWhitespaceNormalizedTierOfFullHash(string line)
+    {
+        Assert.Equal(LineHasher.Hash(line).WhitespaceNormalized, LineHasher.HashWhitespaceNormalized(line));
+    }
 }
