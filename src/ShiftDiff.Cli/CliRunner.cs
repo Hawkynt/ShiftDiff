@@ -40,6 +40,16 @@ public static class CliRunner
             return 1;
         }
 
+        if (HasMatchingExtension(oldPath, newPath, ".ini"))
+        {
+            foreach (var line in IniChangeFormatter.Format(IniComparer.Compare(oldContent, newContent)))
+            {
+                output.WriteLine(line);
+            }
+
+            return 0;
+        }
+
         var result = FileComparer.Compare(oldContent, newContent);
         var unifiedDiffFile = UnifiedDiffBuilder.Build(result.Changes, oldPath, newPath);
 
@@ -163,6 +173,10 @@ public static class CliRunner
 
         return 0;
     }
+
+    private static bool HasMatchingExtension(string oldPath, string newPath, string extension) =>
+        string.Equals(Path.GetExtension(oldPath), extension, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(Path.GetExtension(newPath), extension, StringComparison.OrdinalIgnoreCase);
 
     private static void WriteResolvedLine(ThreeWayChange change, TextWriter output)
     {

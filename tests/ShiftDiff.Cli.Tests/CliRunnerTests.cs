@@ -40,6 +40,25 @@ public class CliRunnerTests
     }
 
     [Fact]
+    public void Run_TwoIniFiles_PrintsFormattedIniChangesNotUnifiedDiff()
+    {
+        var oldPath = WriteTempFile("[a]\nkey=1\nother=2\n", ".ini");
+        var newPath = WriteTempFile("[a]\nkey=1\nother=3\n", ".ini");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = CliRunner.Run(new[] { oldPath, newPath }, output, error);
+
+        Assert.Equal(0, exitCode);
+        var text = output.ToString();
+        Assert.Contains("a.other: Changed 2 -> 3", text);
+        Assert.DoesNotContain("a.key", text);
+        Assert.DoesNotContain("@@", text);
+        Assert.DoesNotContain("---", text);
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public void Run_NoArgs_ReturnsNonZeroAndWritesUsageToError()
     {
         AssertWrongArgCountFails(Array.Empty<string>());
@@ -108,9 +127,11 @@ public class CliRunnerTests
         }
     }
 
-    private static string WriteTempFile(string content)
+    private static string WriteTempFile(string content) => WriteTempFile(content, ".txt");
+
+    private static string WriteTempFile(string content, string extension)
     {
-        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + extension);
         File.WriteAllText(path, content);
         return path;
     }
