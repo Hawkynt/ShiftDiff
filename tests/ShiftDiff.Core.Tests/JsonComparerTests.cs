@@ -209,6 +209,18 @@ public class JsonComparerTests
     }
 
     [Fact]
+    public void Compare_DuplicateKeysInObject_DoesNotThrow_LastValueWins()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("""{"a": 1, "a": 2}"""),
+            Bytes("""{"a": 2}"""));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("a", change.Path);
+        Assert.Equal(JsonChangeType.Unchanged, change.ChangeType);
+    }
+
+    [Fact]
     public void Compare_BothSidesMalformed_IdenticalRawText_MarksUnchanged()
     {
         var changes = JsonComparer.Compare(

@@ -54,8 +54,12 @@ public static class JsonComparer
 
     private static void CompareObjects(JsonElement baseObject, JsonElement targetObject, string? path, List<JsonChange> changes)
     {
-        var baseProperties = baseObject.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
-        var targetProperties = targetObject.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+        // JSON permits duplicate keys at the same nesting level (RFC 8259 doesn't forbid them, and
+        // JsonDocument.Parse doesn't reject them) — ToDictionary would throw on the second occurrence,
+        // so build the map with plain indexer assignment instead; last value wins, same convention
+        // MarkdownComparer's section-parsing dictionary already uses for repeated keys.
+        var baseProperties = ToLastWinsMap(baseObject);
+        var targetProperties = ToLastWinsMap(targetObject);
 
         var keys = baseProperties.Keys.Union(targetProperties.Keys).OrderBy(k => k, StringComparer.Ordinal);
 
@@ -86,5 +90,16 @@ public static class JsonComparer
 
             changes.Add(new JsonChange(childPath, changeType, oldValue, newValue));
         }
+    }
+
+    private static Dictionary<string, JsonElement> ToLastWinsMap(JsonElement obj)
+    {
+        var map = new Dictionary<string, JsonElement>();
+        foreach (var property in obj.EnumerateObject())
+        {
+            map[property.Name] = property.Value;
+        }
+
+        return map;
     }
 }
