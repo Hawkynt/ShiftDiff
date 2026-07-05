@@ -105,4 +105,21 @@ public class AnchorDetectorTests
 
         Assert.Equal(3, AnchorDetector.DuplicateCounts(lines).Length);
     }
+
+    [Fact]
+    public void DetectWithDuplicateCounts_ReturnsSameAnchorsAsDetectAndSameCountsAsDuplicateCounts()
+    {
+        var lines = new[]
+        {
+            "public static LineHash Hash(string line)",
+            "x = 1;",
+            "public   static   LineHash   Hash(string   line)",
+            "y = 2;",
+        };
+
+        var (anchors, counts) = AnchorDetector.DetectWithDuplicateCounts(lines);
+
+        Assert.Equal(AnchorDetector.Detect(lines), anchors);
+        Assert.Equal(AnchorDetector.DuplicateCounts(lines), counts);
+    }
 }

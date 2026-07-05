@@ -14,8 +14,7 @@ public static class BlockClassifier
     {
         var matches = new BlockMatch[candidates.Length];
         var threshold = DetectionModeThresholds.MovedConfidenceThreshold(mode);
-        var duplicateCounts = AnchorDetector.DuplicateCounts(oldLines);
-        var oldAnchors = AnchorDetector.Detect(oldLines);
+        var (oldAnchors, duplicateCounts) = AnchorDetector.DetectWithDuplicateCounts(oldLines);
         var newAnchors = AnchorDetector.Detect(newLines);
 
         for (var index = 0; index < candidates.Length; index++)

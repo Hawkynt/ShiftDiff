@@ -23,25 +23,30 @@ public static class AnchorDetector
         return hashes.Select(hash => counts[hash]).ToArray();
     }
 
-    public static LineAnchor[] Detect(string[] lines)
+    public static LineAnchor[] Detect(string[] lines) => DetectWithDuplicateCounts(lines).Anchors;
+
+    /// <summary>
+    /// Combined form of <see cref="Detect"/> and <see cref="DuplicateCounts"/> — callers that need
+    /// both (e.g. <see cref="BlockClassifier.Classify"/>) previously hashed every line twice, once
+    /// per method. This computes the hash pass exactly once and derives both results from it.
+    /// </summary>
+    public static (LineAnchor[] Anchors, int[] DuplicateCounts) DetectWithDuplicateCounts(string[] lines)
     {
-        // Hash each line exactly once (SHA-256 x4 per LineHasher.Hash call is not
-        // cheap at 100,000-line scale) and reuse it for both the duplicate-count
-        // grouping and per-line classification below, instead of hashing every
-        // line twice.
         var lineHashes = lines.Select(line => LineHasher.Hash(line).WhitespaceNormalized).ToArray();
         var whitespaceNormalizedCounts = lineHashes
             .GroupBy(hash => hash)
             .ToDictionary(group => group.Key, group => group.Count());
 
         var anchors = new LineAnchor[lines.Length];
+        var duplicateCounts = new int[lines.Length];
 
         for (var index = 0; index < lines.Length; index++)
         {
             anchors[index] = new LineAnchor(index, lines[index], ClassifyLine(lines[index], lineHashes[index], whitespaceNormalizedCounts));
+            duplicateCounts[index] = whitespaceNormalizedCounts[lineHashes[index]];
         }
 
-        return anchors;
+        return (anchors, duplicateCounts);
     }
 
     private static AnchorQuality ClassifyLine(string line, string whitespaceNormalizedHash, Dictionary<string, int> whitespaceNormalizedCounts)
