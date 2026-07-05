@@ -66,4 +66,70 @@ public class XmlComparerTests
         Assert.Equal("2", change.OldValue);
         Assert.Null(change.NewValue);
     }
+
+    [Fact]
+    public void Compare_IdenticalChildElement_AllUnchanged()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><b x="1"/></a>"""u8.ToArray(),
+            """<a><b x="1"/></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("b/@x", change.Path);
+        Assert.Equal(XmlChangeType.Unchanged, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_ChildElementAttributeChanged_MarksChangedAtNestedPath()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><b x="1"/></a>"""u8.ToArray(),
+            """<a><b x="2"/></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("b/@x", change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+        Assert.Equal("1", change.OldValue);
+        Assert.Equal("2", change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_ChildElementAdded_MarksAddedAtChildPathOnly()
+    {
+        var changes = XmlComparer.Compare(
+            """<a></a>"""u8.ToArray(),
+            """<a><b x="1"/></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("b", change.Path);
+        Assert.Equal(XmlChangeType.Added, change.ChangeType);
+        Assert.Null(change.OldValue);
+        Assert.NotNull(change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_ChildElementRemoved_MarksRemovedAtChildPathOnly()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><b x="1"/></a>"""u8.ToArray(),
+            """<a></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("b", change.Path);
+        Assert.Equal(XmlChangeType.Removed, change.ChangeType);
+        Assert.Null(change.NewValue);
+        Assert.NotNull(change.OldValue);
+    }
+
+    [Fact]
+    public void Compare_GrandchildElementAttributeChanged_MarksChangedAtDeepPath()
+    {
+        var changes = XmlComparer.Compare(
+            """<a><b><c x="1"/></b></a>"""u8.ToArray(),
+            """<a><b><c x="2"/></b></a>"""u8.ToArray());
+
+        var change = Assert.Single(changes);
+        Assert.Equal("b/c/@x", change.Path);
+        Assert.Equal(XmlChangeType.Changed, change.ChangeType);
+    }
 }

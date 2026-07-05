@@ -20,12 +20,45 @@ public static class XmlComparer
         var baseRoot = XDocument.Parse(Encoding.UTF8.GetString(baseXml)).Root!;
         var targetRoot = XDocument.Parse(Encoding.UTF8.GetString(targetXml)).Root!;
 
-        var baseAttributes = baseRoot.Attributes().ToDictionary(a => a.Name.LocalName, a => a.Value);
-        var targetAttributes = targetRoot.Attributes().ToDictionary(a => a.Name.LocalName, a => a.Value);
+        var changes = new List<XmlChange>();
+        CompareElements(baseRoot, targetRoot, path: null, changes);
+        return changes.ToArray();
+    }
+
+    private static void CompareElements(XElement baseElement, XElement targetElement, string? path, List<XmlChange> changes)
+    {
+        CompareAttributes(baseElement, targetElement, path, changes);
+
+        // Deferred: repeated same-name child elements (e.g. lists) throw on ToDictionary; only single-occurrence names are supported so far.
+        var baseChildren = baseElement.Elements().ToDictionary(e => e.Name.LocalName, e => e);
+        var targetChildren = targetElement.Elements().ToDictionary(e => e.Name.LocalName, e => e);
+
+        var childNames = baseChildren.Keys.Union(targetChildren.Keys).OrderBy(n => n, StringComparer.Ordinal);
+
+        foreach (var name in childNames)
+        {
+            var hasOld = baseChildren.TryGetValue(name, out var oldChild);
+            var hasNew = targetChildren.TryGetValue(name, out var newChild);
+            var childPath = path is null ? name : $"{path}/{name}";
+
+            if (hasOld && hasNew)
+            {
+                CompareElements(oldChild!, newChild!, childPath, changes);
+                continue;
+            }
+
+            var changeType = hasNew ? XmlChangeType.Added : XmlChangeType.Removed;
+            changes.Add(new XmlChange(childPath, changeType, hasOld ? oldChild!.ToString() : null, hasNew ? newChild!.ToString() : null));
+        }
+    }
+
+    private static void CompareAttributes(XElement baseElement, XElement targetElement, string? path, List<XmlChange> changes)
+    {
+        var baseAttributes = baseElement.Attributes().ToDictionary(a => a.Name.LocalName, a => a.Value);
+        var targetAttributes = targetElement.Attributes().ToDictionary(a => a.Name.LocalName, a => a.Value);
 
         var names = baseAttributes.Keys.Union(targetAttributes.Keys).OrderBy(n => n, StringComparer.Ordinal);
 
-        var changes = new List<XmlChange>();
         foreach (var name in names)
         {
             var hasOld = baseAttributes.TryGetValue(name, out var oldValue);
@@ -39,9 +72,8 @@ public static class XmlComparer
                 _ => XmlChangeType.Changed,
             };
 
-            changes.Add(new XmlChange($"@{name}", changeType, hasOld ? oldValue : null, hasNew ? newValue : null));
+            var attributePath = path is null ? $"@{name}" : $"{path}/@{name}";
+            changes.Add(new XmlChange(attributePath, changeType, hasOld ? oldValue : null, hasNew ? newValue : null));
         }
-
-        return changes.ToArray();
     }
 }
