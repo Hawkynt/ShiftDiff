@@ -1,0 +1,77 @@
+using System.Text;
+using Xunit;
+
+namespace ShiftDiff.Core.Tests;
+
+public class MarkdownMoveDetectorTests
+{
+    private static byte[] Bytes(string markdown) => Encoding.UTF8.GetBytes(markdown);
+
+    [Fact]
+    public void Detect_IdenticalBodyUnderRenamedHeading_MarksMovedWithMovedFrom()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Old\ncontent\n"),
+            Bytes("# New\ncontent\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        var moved = Assert.Single(result);
+        Assert.Equal(MarkdownChangeType.Moved, moved.ChangeType);
+        Assert.Equal("# New", moved.Path);
+        Assert.Equal("# Old", moved.MovedFrom);
+    }
+
+    [Fact]
+    public void Detect_DifferentContent_NoMoveDetected_StaysAddedAndRemoved()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Old\ncontent one\n"),
+            Bytes("# New\ncontent two\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(2, result.Length);
+        Assert.Contains(result, c => c.Path == "# Old" && c.ChangeType == MarkdownChangeType.Removed);
+        Assert.Contains(result, c => c.Path == "# New" && c.ChangeType == MarkdownChangeType.Added);
+    }
+
+    [Fact]
+    public void Detect_AmbiguousMultipleCandidatesWithSameContent_LeavesAsAddedAndRemoved()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# A\nsame\n\n# B\nsame\n"),
+            Bytes("# C\nsame\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(3, result.Length);
+        Assert.All(result, c => Assert.NotEqual(MarkdownChangeType.Moved, c.ChangeType));
+    }
+
+    [Fact]
+    public void Detect_UnchangedAndChangedEntries_PassThroughUnaffected()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Same\ntext\n\n# Edited\nold\n"),
+            Bytes("# Same\ntext\n\n# Edited\nnew\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(2, result.Length);
+        Assert.Contains(result, c => c.Path == "# Same" && c.ChangeType == MarkdownChangeType.Unchanged);
+        Assert.Contains(result, c => c.Path == "# Edited" && c.ChangeType == MarkdownChangeType.Changed);
+    }
+
+    [Fact]
+    public void Detect_NoAddedOrRemoved_ReturnsInputUnchanged()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Foo\nA\n"),
+            Bytes("# Foo\nA\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(changes, result);
+    }
+}

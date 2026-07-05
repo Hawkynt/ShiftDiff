@@ -8,9 +8,10 @@ public enum MarkdownChangeType
     Removed,
     Changed,
     Unchanged,
+    Moved,
 }
 
-public sealed record MarkdownChange(string Path, MarkdownChangeType ChangeType, string? OldValue = null, string? NewValue = null, LineChange[]? BodyChanges = null);
+public sealed record MarkdownChange(string Path, MarkdownChangeType ChangeType, string? OldValue = null, string? NewValue = null, LineChange[]? BodyChanges = null, string? MovedFrom = null);
 
 public static class MarkdownComparer
 {
