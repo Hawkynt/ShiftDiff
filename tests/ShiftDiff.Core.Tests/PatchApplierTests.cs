@@ -266,6 +266,28 @@ public class PatchApplierTests
     }
 
     [Fact]
+    public void FindFuzzyCandidates_HunkOldContentLongerThanEntireSource_ReturnsEmpty()
+    {
+        // Counterpart to Semantic_HunkOldContentLongerThanEntireSource_...:
+        // fuzzy mode never throws here, it just reports no candidates,
+        // same as the already-tested ContextNotFoundAnywhere case.
+        var source = new[] { "x", "y" };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 3, 1, 3),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Context, "a"),
+                new(UnifiedDiffLineKind.Removed, "b"),
+                new(UnifiedDiffLineKind.Added, "B"),
+                new(UnifiedDiffLineKind.Context, "c"),
+            });
+
+        var candidates = PatchApplier.FindFuzzyCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
+
+    [Fact]
     public void FindFuzzyCandidates_PureInsertionHunk_ReturnsEmpty()
     {
         var source = new[] { "a", "b", "c" };
