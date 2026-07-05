@@ -65,6 +65,23 @@ public static class MarkdownComparer
             sections[currentKey] = content;
         }
 
+        void ApplyHeading(string headingLine, int level)
+        {
+            if (headingStack.Count >= level)
+            {
+                headingStack.RemoveRange(level - 1, headingStack.Count - (level - 1));
+            }
+
+            while (headingStack.Count < level - 1)
+            {
+                headingStack.Add("");
+            }
+
+            headingStack.Add(headingLine);
+            currentKey = string.Join(" > ", headingStack.Where(s => s.Length > 0));
+            currentContent = new List<string>();
+        }
+
         foreach (var rawLine in text.Split('\n'))
         {
             var line = rawLine.TrimEnd('\r');
@@ -76,23 +93,20 @@ public static class MarkdownComparer
                 continue;
             }
 
+            if (!insideCodeFence && TryGetSetextLevel(line, out var setextLevel)
+                && currentContent.Count > 0 && currentContent[^1].Trim().Length > 0)
+            {
+                var headingText = currentContent[^1].Trim();
+                currentContent.RemoveAt(currentContent.Count - 1);
+                Flush();
+                ApplyHeading(new string('#', setextLevel) + " " + headingText, setextLevel);
+                continue;
+            }
+
             if (!insideCodeFence && TryGetHeadingLevel(line, out var level))
             {
                 Flush();
-
-                if (headingStack.Count >= level)
-                {
-                    headingStack.RemoveRange(level - 1, headingStack.Count - (level - 1));
-                }
-
-                while (headingStack.Count < level - 1)
-                {
-                    headingStack.Add("");
-                }
-
-                headingStack.Add(line.Trim());
-                currentKey = string.Join(" > ", headingStack.Where(s => s.Length > 0));
-                currentContent = new List<string>();
+                ApplyHeading(line.Trim(), level);
                 continue;
             }
 
@@ -102,6 +116,26 @@ public static class MarkdownComparer
         Flush();
 
         return sections;
+    }
+
+    private static bool TryGetSetextLevel(string line, out int level)
+    {
+        var trimmed = line.Trim();
+
+        if (trimmed.Length > 0 && trimmed.All(c => c == '='))
+        {
+            level = 1;
+            return true;
+        }
+
+        if (trimmed.Length > 0 && trimmed.All(c => c == '-'))
+        {
+            level = 2;
+            return true;
+        }
+
+        level = 0;
+        return false;
     }
 
     private static bool IsCodeFenceDelimiter(string line)

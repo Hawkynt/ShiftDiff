@@ -150,4 +150,57 @@ public class MarkdownComparerTests
         Assert.Contains("# not a heading", change.OldValue);
         Assert.Contains("code line", change.OldValue);
     }
+
+    [Fact]
+    public void Compare_SetextLevel1Heading_KeyedSameAsEquivalentAtxH1()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("Foo\n===\nHello\n"),
+            Bytes("Foo\n===\nHi\n"));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("# Foo", change.Path);
+        Assert.Equal(MarkdownChangeType.Changed, change.ChangeType);
+        Assert.Equal("Hello", change.OldValue);
+        Assert.Equal("Hi", change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_SetextLevel2Heading_KeyedSameAsEquivalentAtxH2()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# A\nFoo\n---\nHello\n"),
+            Bytes("# A\nFoo\n---\nHi\n"));
+
+        var change = Assert.Single(changes, c => c.ChangeType == MarkdownChangeType.Changed);
+        Assert.Equal("# A > ## Foo", change.Path);
+        Assert.Equal("Hello", change.OldValue);
+        Assert.Equal("Hi", change.NewValue);
+    }
+
+    [Fact]
+    public void Compare_SetextHeadingStyleChangedToAtx_ContentSame_StillUnchanged()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("Foo\n===\nHello\n"),
+            Bytes("# Foo\nHello\n"));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("# Foo", change.Path);
+        Assert.Equal(MarkdownChangeType.Unchanged, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_BareDashLineAfterBlankLine_TreatedAsContentNotHeading()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Foo\nHello\n\n---\nWorld\n"),
+            Bytes("# Foo\nHello\n\n---\nWorld changed\n"));
+
+        var change = Assert.Single(changes);
+        Assert.Equal("# Foo", change.Path);
+        Assert.Equal(MarkdownChangeType.Changed, change.ChangeType);
+        Assert.Contains("---", change.OldValue!);
+        Assert.Contains("World", change.OldValue!);
+    }
 }
