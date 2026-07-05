@@ -11,6 +11,12 @@ public static class FolderRenameDetector
         double threshold = DefaultThreshold)
     {
         var removed = changes.Where(c => c.ChangeType == FolderChangeType.Removed).ToList();
+        // Precompute each removed file's lines once — the old per-candidate reload inside the outer
+        // `added` loop re-parsed the same removed file's content once per still-unmatched `added`
+        // entry (O(M*K) reloads for M added / K removed files instead of O(K)), the same redundant-
+        // rescan shape found repeatedly elsewhere in this repo (BlockClassifier/BlockSimilarityScorer/
+        // PatchApplier).
+        var removedLinesByPath = removed.ToDictionary(r => r.RelativePath, r => TextFileLoader.Load(baseFiles[r.RelativePath]).Lines);
         var matchedRemoved = new HashSet<string>();
         var renamedFromByAddedPath = new Dictionary<string, string>();
 
@@ -19,7 +25,7 @@ public static class FolderRenameDetector
             var addedLines = TextFileLoader.Load(targetFiles[added.RelativePath]).Lines;
             var candidates = removed
                 .Where(r => !matchedRemoved.Contains(r.RelativePath))
-                .Where(r => Similarity(TextFileLoader.Load(baseFiles[r.RelativePath]).Lines, addedLines) >= threshold)
+                .Where(r => Similarity(removedLinesByPath[r.RelativePath], addedLines) >= threshold)
                 .ToList();
 
             if (candidates.Count == 1)
