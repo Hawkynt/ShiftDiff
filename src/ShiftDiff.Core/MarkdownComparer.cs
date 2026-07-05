@@ -10,7 +10,7 @@ public enum MarkdownChangeType
     Unchanged,
 }
 
-public sealed record MarkdownChange(string Path, MarkdownChangeType ChangeType, string? OldValue = null, string? NewValue = null);
+public sealed record MarkdownChange(string Path, MarkdownChangeType ChangeType, string? OldValue = null, string? NewValue = null, LineChange[]? BodyChanges = null);
 
 public static class MarkdownComparer
 {
@@ -35,7 +35,11 @@ public static class MarkdownComparer
                 _ => MarkdownChangeType.Changed,
             };
 
-            changes.Add(new MarkdownChange(path, changeType, hasOld ? oldValue : null, hasNew ? newValue : null));
+            var bodyChanges = changeType == MarkdownChangeType.Changed
+                ? LineDiffer.Diff(oldValue!.Split('\n'), newValue!.Split('\n'))
+                : null;
+
+            changes.Add(new MarkdownChange(path, changeType, hasOld ? oldValue : null, hasNew ? newValue : null, bodyChanges));
         }
 
         return changes.ToArray();

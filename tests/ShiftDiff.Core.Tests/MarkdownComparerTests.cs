@@ -16,6 +16,7 @@ public class MarkdownComparerTests
             Bytes("# Foo\nHello\n\n## Bar\nWorld\n"));
 
         Assert.All(changes, c => Assert.Equal(MarkdownChangeType.Unchanged, c.ChangeType));
+        Assert.All(changes, c => Assert.Null(c.BodyChanges));
         Assert.Equal(2, changes.Length);
     }
 
@@ -34,6 +35,18 @@ public class MarkdownComparerTests
     }
 
     [Fact]
+    public void Compare_SectionContentChanged_BodyChangesIsolateTheChangedLine()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Foo\nline1\nline2\n"),
+            Bytes("# Foo\nline1\nCHANGED\n"));
+
+        var change = Assert.Single(changes);
+        Assert.NotNull(change.BodyChanges);
+        Assert.Contains(change.BodyChanges!, lc => lc.ChangeType == ChangeType.Edited && lc.OldLine == "line2" && lc.NewLine == "CHANGED");
+    }
+
+    [Fact]
     public void Compare_HeadingAdded_MarksAdded()
     {
         var changes = MarkdownComparer.Compare(
@@ -44,6 +57,7 @@ public class MarkdownComparerTests
         Assert.Equal("# Baz", change.Path);
         Assert.Null(change.OldValue);
         Assert.Equal("New", change.NewValue);
+        Assert.Null(change.BodyChanges);
     }
 
     [Fact]
@@ -57,6 +71,7 @@ public class MarkdownComparerTests
         Assert.Equal("# Baz", change.Path);
         Assert.Equal("Old", change.OldValue);
         Assert.Null(change.NewValue);
+        Assert.Null(change.BodyChanges);
     }
 
     [Fact]
