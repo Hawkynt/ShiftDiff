@@ -914,4 +914,58 @@ public class PatchApplierTests
 
         Assert.Empty(candidates);
     }
+
+    [Fact]
+    public void FindSemanticCandidates_DecoyAnchorImpliesNegativeStartIndex_IsFilteredLeavingOnlyTheRealMatch()
+    {
+        var source = new[]
+        {
+            "beta target line for real match content here too",
+            "filler unrelated padding line number one here",
+            "alpha target line for real match content here",
+            "gamma unrelated trailer line number two here",
+        };
+        var hunk = new UnifiedDiffHunk(
+            new UnifiedDiffHunkHeader(1, 2, 1, 2),
+            new UnifiedDiffLine[]
+            {
+                new(UnifiedDiffLineKind.Removed, "alpha target line for real match content here"),
+                new(UnifiedDiffLineKind.Removed, "beta target line for real match content here too"),
+            });
+
+        var candidates = PatchApplier.FindSemanticCandidates(source, hunk);
+
+        Assert.Single(candidates);
+        Assert.Equal(3, candidates[0].LineNumber);
+    }
+
+    [Fact]
+    public void FindSemanticCandidates_MatchedAnchorTooSparseInSurroundingBlock_ScoresBelowThresholdAndReturnsEmpty()
+    {
+        var source = new[]
+        {
+            "new0 y0", "new1 y1", "new2 y2", "new3 y3", "new4 y4",
+            "sharedAnchorLine007",
+            "new5 y5", "new6 y6", "new7 y7", "new8 y8", "new9 y9",
+        };
+        var hunkLines = new List<UnifiedDiffLine>
+        {
+            new(UnifiedDiffLineKind.Removed, "old0 x0"),
+            new(UnifiedDiffLineKind.Removed, "old1 x1"),
+            new(UnifiedDiffLineKind.Removed, "old2 x2"),
+            new(UnifiedDiffLineKind.Removed, "old3 x3"),
+            new(UnifiedDiffLineKind.Removed, "old4 x4"),
+            new(UnifiedDiffLineKind.Removed, "sharedAnchorLine007"),
+            new(UnifiedDiffLineKind.Removed, "old5 x5"),
+            new(UnifiedDiffLineKind.Removed, "old6 x6"),
+            new(UnifiedDiffLineKind.Removed, "old7 x7"),
+            new(UnifiedDiffLineKind.Removed, "old8 x8"),
+            new(UnifiedDiffLineKind.Removed, "old9 x9"),
+        };
+        var hunk = new UnifiedDiffHunk(new UnifiedDiffHunkHeader(1, 11, 1, 11), hunkLines.ToArray());
+
+        var candidates = PatchApplier.FindSemanticCandidates(source, hunk);
+
+        Assert.Empty(candidates);
+    }
 }
