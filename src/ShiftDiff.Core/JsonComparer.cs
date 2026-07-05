@@ -19,18 +19,34 @@ public static class JsonComparer
         using var baseDocument = JsonDocument.Parse(baseJson);
         using var targetDocument = JsonDocument.Parse(targetJson);
 
-        var baseProperties = baseDocument.RootElement.EnumerateObject()
-            .ToDictionary(p => p.Name, p => p.Value.GetRawText());
-        var targetProperties = targetDocument.RootElement.EnumerateObject()
-            .ToDictionary(p => p.Name, p => p.Value.GetRawText());
+        var changes = new List<JsonChange>();
+        CompareObjects(baseDocument.RootElement, targetDocument.RootElement, path: null, changes);
+        return changes.ToArray();
+    }
+
+    private static void CompareObjects(JsonElement baseObject, JsonElement targetObject, string? path, List<JsonChange> changes)
+    {
+        var baseProperties = baseObject.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+        var targetProperties = targetObject.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
 
         var keys = baseProperties.Keys.Union(targetProperties.Keys).OrderBy(k => k, StringComparer.Ordinal);
 
-        var changes = new List<JsonChange>();
         foreach (var key in keys)
         {
-            var hasOld = baseProperties.TryGetValue(key, out var oldValue);
-            var hasNew = targetProperties.TryGetValue(key, out var newValue);
+            var hasOld = baseProperties.TryGetValue(key, out var oldElement);
+            var hasNew = targetProperties.TryGetValue(key, out var newElement);
+            var childPath = path is null ? key : $"{path}.{key}";
+
+            if (hasOld && hasNew
+                && oldElement.ValueKind == JsonValueKind.Object
+                && newElement.ValueKind == JsonValueKind.Object)
+            {
+                CompareObjects(oldElement, newElement, childPath, changes);
+                continue;
+            }
+
+            var oldValue = hasOld ? oldElement.GetRawText() : null;
+            var newValue = hasNew ? newElement.GetRawText() : null;
 
             var changeType = (hasOld, hasNew) switch
             {
@@ -40,9 +56,7 @@ public static class JsonComparer
                 _ => JsonChangeType.Changed,
             };
 
-            changes.Add(new JsonChange(key, changeType, oldValue, newValue));
+            changes.Add(new JsonChange(childPath, changeType, oldValue, newValue));
         }
-
-        return changes.ToArray();
     }
 }
