@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 namespace ShiftDiff.Core;
@@ -16,12 +17,26 @@ public static class JsonComparer
 {
     public static JsonChange[] Compare(byte[] baseJson, byte[] targetJson)
     {
-        using var baseDocument = JsonDocument.Parse(baseJson);
-        using var targetDocument = JsonDocument.Parse(targetJson);
+        JsonDocument? baseDocument = null;
+        try
+        {
+            baseDocument = JsonDocument.Parse(baseJson);
+            using var targetDocument = JsonDocument.Parse(targetJson);
 
-        var changes = new List<JsonChange>();
-        CompareValues(baseDocument.RootElement, targetDocument.RootElement, path: null, changes);
-        return changes.ToArray();
+            var changes = new List<JsonChange>();
+            CompareValues(baseDocument.RootElement, targetDocument.RootElement, path: null, changes);
+            return changes.ToArray();
+        }
+        catch (JsonException)
+        {
+            var oldRawText = Encoding.UTF8.GetString(baseJson);
+            var newRawText = Encoding.UTF8.GetString(targetJson);
+            return [new JsonChange(null, oldRawText == newRawText ? JsonChangeType.Unchanged : JsonChangeType.Changed, oldRawText, newRawText)];
+        }
+        finally
+        {
+            baseDocument?.Dispose();
+        }
     }
 
     private static void CompareValues(JsonElement baseValue, JsonElement targetValue, string? path, List<JsonChange> changes)

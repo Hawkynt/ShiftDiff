@@ -183,4 +183,40 @@ public class JsonComparerTests
         Assert.Null(change.Path);
         Assert.Equal(JsonChangeType.Changed, change.ChangeType);
     }
+
+    [Fact]
+    public void Compare_BothSidesMalformed_FallsBackToRawTextComparison()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("{not json"),
+            Bytes("{also not json"));
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(JsonChangeType.Changed, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_OneSideMalformed_FallsBackToRawTextComparison()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("""{"a": 1}"""),
+            Bytes("{not json"));
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(JsonChangeType.Changed, change.ChangeType);
+    }
+
+    [Fact]
+    public void Compare_BothSidesMalformed_IdenticalRawText_MarksUnchanged()
+    {
+        var changes = JsonComparer.Compare(
+            Bytes("{not json"),
+            Bytes("{not json"));
+
+        var change = Assert.Single(changes);
+        Assert.Null(change.Path);
+        Assert.Equal(JsonChangeType.Unchanged, change.ChangeType);
+    }
 }
