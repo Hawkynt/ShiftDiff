@@ -108,4 +108,17 @@ public class MarkdownComparerTests
         var untouched = Assert.Single(changes, c => c.Path == "# B > ## X");
         Assert.Equal(MarkdownChangeType.Unchanged, untouched.ChangeType);
     }
+
+    [Fact]
+    public void Compare_SkippedIntermediateHeadingLevel_DoesNotCrashAndKeysByPresentAncestors()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# A\n### B\nfirst\n"),
+            Bytes("# A\n### B\nfirst-CHANGED\n"));
+
+        var change = Assert.Single(changes, c => c.ChangeType == MarkdownChangeType.Changed);
+        Assert.Equal("# A > ### B", change.Path);
+        Assert.Equal("first", change.OldValue);
+        Assert.Equal("first-CHANGED", change.NewValue);
+    }
 }
