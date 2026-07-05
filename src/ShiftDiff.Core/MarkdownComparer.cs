@@ -44,6 +44,7 @@ public static class MarkdownComparer
     private static Dictionary<string, string> Parse(string text)
     {
         var sections = new Dictionary<string, string>();
+        var headingStack = new List<string>();
         var currentKey = "";
         var currentContent = new List<string>();
 
@@ -62,10 +63,22 @@ public static class MarkdownComparer
         {
             var line = rawLine.TrimEnd('\r');
 
-            if (IsHeading(line))
+            if (TryGetHeadingLevel(line, out var level))
             {
                 Flush();
-                currentKey = line.Trim();
+
+                if (headingStack.Count >= level)
+                {
+                    headingStack.RemoveRange(level - 1, headingStack.Count - (level - 1));
+                }
+
+                while (headingStack.Count < level - 1)
+                {
+                    headingStack.Add("");
+                }
+
+                headingStack.Add(line.Trim());
+                currentKey = string.Join(" > ", headingStack.Where(s => s.Length > 0));
                 currentContent = new List<string>();
                 continue;
             }
@@ -78,7 +91,7 @@ public static class MarkdownComparer
         return sections;
     }
 
-    private static bool IsHeading(string line)
+    private static bool TryGetHeadingLevel(string line, out int level)
     {
         var trimmed = line.TrimStart();
         var hashCount = 0;
@@ -87,6 +100,13 @@ public static class MarkdownComparer
             hashCount++;
         }
 
-        return hashCount is >= 1 and <= 6 && hashCount < trimmed.Length && trimmed[hashCount] == ' ';
+        if (hashCount is >= 1 and <= 6 && hashCount < trimmed.Length && trimmed[hashCount] == ' ')
+        {
+            level = hashCount;
+            return true;
+        }
+
+        level = 0;
+        return false;
     }
 }

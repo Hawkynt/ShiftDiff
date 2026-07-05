@@ -92,4 +92,20 @@ public class MarkdownComparerTests
 
         Assert.DoesNotContain(changes, c => c.Path == "");
     }
+
+    [Fact]
+    public void Compare_NestedHeadingsSameTextDifferentParents_EditDetectedSeparately()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# A\n## X\nfirst\n\n# B\n## X\nsecond\n"),
+            Bytes("# A\n## X\nfirst-CHANGED\n\n# B\n## X\nsecond\n"));
+
+        var change = Assert.Single(changes, c => c.ChangeType == MarkdownChangeType.Changed);
+        Assert.Equal("# A > ## X", change.Path);
+        Assert.Equal("first", change.OldValue);
+        Assert.Equal("first-CHANGED", change.NewValue);
+
+        var untouched = Assert.Single(changes, c => c.Path == "# B > ## X");
+        Assert.Equal(MarkdownChangeType.Unchanged, untouched.ChangeType);
+    }
 }
