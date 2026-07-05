@@ -23,6 +23,25 @@ public class MarkdownMoveDetectorTests
     }
 
     [Fact]
+    public void Detect_MoveAlongsideUnrelatedChange_PassesThroughTheUnrelatedChangeUnaffected()
+    {
+        var changes = MarkdownComparer.Compare(
+            Bytes("# Old\ncontent\n\n# Edited\nold body\n"),
+            Bytes("# New\ncontent\n\n# Edited\nnew body\n"));
+
+        var result = MarkdownMoveDetector.Detect(changes);
+
+        Assert.Equal(2, result.Length);
+        var moved = Assert.Single(result, c => c.Path == "# New");
+        Assert.Equal(MarkdownChangeType.Moved, moved.ChangeType);
+        Assert.Equal("# Old", moved.MovedFrom);
+        var edited = Assert.Single(result, c => c.Path == "# Edited");
+        Assert.Equal(MarkdownChangeType.Changed, edited.ChangeType);
+        Assert.Equal("old body", edited.OldValue);
+        Assert.Equal("new body", edited.NewValue);
+    }
+
+    [Fact]
     public void Detect_DifferentContent_NoMoveDetected_StaysAddedAndRemoved()
     {
         var changes = MarkdownComparer.Compare(
