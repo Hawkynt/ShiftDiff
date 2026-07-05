@@ -66,4 +66,25 @@ public class LineTokenizerTests
         var tokens = LineTokenizer.TokenizeSourceCode(line);
         Assert.Equal(line, string.Concat(tokens));
     }
+
+    [Fact]
+    public void TokenizeSourceCode_TreatsLineCommentAsSingleToken()
+    {
+        var tokens = LineTokenizer.TokenizeSourceCode("x = 1; // note");
+        Assert.Equal("// note", tokens[^1]);
+    }
+
+    [Fact]
+    public void TokenizeSourceCode_SlashInsideStringLiteral_NotTreatedAsComment()
+    {
+        var tokens = LineTokenizer.TokenizeSourceCode("\"a//b\"");
+        Assert.Equal(new[] { "\"a//b\"" }, tokens);
+    }
+
+    [Fact]
+    public void TokenizeSourceCode_SingleSlash_NotTreatedAsCommentStart()
+    {
+        var tokens = LineTokenizer.TokenizeSourceCode("a / b");
+        Assert.Equal(new[] { "a", " / ", "b" }, tokens);
+    }
 }

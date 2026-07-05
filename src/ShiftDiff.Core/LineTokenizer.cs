@@ -40,6 +40,12 @@ public static class LineTokenizer
 
         while (i < line.Length)
         {
+            if (IsLineCommentStart(line, i))
+            {
+                tokens.Add(line[i..]);
+                break;
+            }
+
             if (IsQuoteChar(line[i]))
             {
                 var literalEnd = FindLiteralEnd(line, i);
@@ -51,7 +57,7 @@ public static class LineTokenizer
             var start = i;
             var inWord = IsWordChar(line[i]);
             i++;
-            while (i < line.Length && !IsQuoteChar(line[i]) && IsWordChar(line[i]) == inWord)
+            while (i < line.Length && !IsQuoteChar(line[i]) && !IsLineCommentStart(line, i) && IsWordChar(line[i]) == inWord)
             {
                 i++;
             }
@@ -85,6 +91,9 @@ public static class LineTokenizer
 
         return line.Length;
     }
+
+    private static bool IsLineCommentStart(string line, int i) =>
+        i + 1 < line.Length && line[i] == '/' && line[i + 1] == '/';
 
     private static bool IsQuoteChar(char c) => c is '"' or '\'';
 
