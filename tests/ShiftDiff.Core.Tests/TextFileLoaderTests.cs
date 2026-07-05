@@ -31,6 +31,53 @@ public class TextFileLoaderTests
     }
 
     [Fact]
+    public void Load_Utf32LeBom_DetectsUtf32Le()
+    {
+        var bom = new byte[] { 0xFF, 0xFE, 0x00, 0x00 };
+        var content = bom.Concat(new UTF32Encoding(bigEndian: false, byteOrderMark: false).GetBytes("hi")).ToArray();
+
+        var result = TextFileLoader.Load(content);
+
+        Assert.Equal("utf-32", result.Encoding.WebName);
+        Assert.Equal(new[] { "hi" }, result.Lines);
+    }
+
+    [Fact]
+    public void Load_Utf32BeBom_DetectsUtf32Be()
+    {
+        var bom = new byte[] { 0x00, 0x00, 0xFE, 0xFF };
+        var content = bom.Concat(new UTF32Encoding(bigEndian: true, byteOrderMark: false).GetBytes("hi")).ToArray();
+
+        var result = TextFileLoader.Load(content);
+
+        Assert.Equal("utf-32BE", result.Encoding.WebName);
+        Assert.Equal(new[] { "hi" }, result.Lines);
+    }
+
+    [Fact]
+    public void Load_Utf16BeBom_DetectsUtf16Be()
+    {
+        var bom = new byte[] { 0xFE, 0xFF };
+        var content = bom.Concat(Encoding.BigEndianUnicode.GetBytes("hi")).ToArray();
+
+        var result = TextFileLoader.Load(content);
+
+        Assert.Equal("utf-16BE", result.Encoding.WebName);
+        Assert.Equal(new[] { "hi" }, result.Lines);
+    }
+
+    [Fact]
+    public void Load_BareCrLineEndings_ReportsCr()
+    {
+        var content = Encoding.UTF8.GetBytes("a\rb\rc");
+
+        var result = TextFileLoader.Load(content);
+
+        Assert.Equal(new[] { "a", "b", "c" }, result.Lines);
+        Assert.Equal(LineEnding.Cr, result.OriginalEnding);
+    }
+
+    [Fact]
     public void Load_NoBom_DefaultsToUtf8()
     {
         var content = Encoding.UTF8.GetBytes("plain text");
