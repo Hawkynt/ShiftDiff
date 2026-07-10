@@ -110,7 +110,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnDrop(object? sender, DragEventArgs e)
     {
-        var paths = e.DataTransfer.GetFiles()?
+        var paths = e.DataTransfer.TryGetFiles()?
             .OfType<IStorageFile>()
             .Select(file => file.Path.LocalPath)
             .Where(File.Exists)
@@ -220,7 +220,7 @@ public sealed partial class MainWindow : Window
         {
             _movedBlocks.Add(new MovedBlockViewModel(
                 $"{block.MatchType} · {block.Confidence}",
-                $"old {block.OldStart + 1}–{block.OldEnd + 1} → new {block.NewStart + 1}–{block.NewEnd + 1} · {block.SimilarityScore:P0}"));
+                $"old {block.OldStart + 1}–{block.OldEnd + 1} → new {block.NewStart + 1}–{block.NewEnd + 1} · {block.Score:P0}"));
         }
 
         var added = comparison.Changes.Count(change => change.ChangeType == ChangeType.Added);
