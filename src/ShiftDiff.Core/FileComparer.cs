@@ -61,10 +61,9 @@ public static class FileComparer
 
     private static string DecodeForDetection(byte[] content)
     {
-        if (content.AsSpan().StartsWith([0xEF, 0xBB, 0xBF])) return Encoding.UTF8.GetString(content, 3, content.Length - 3);
-        if (content.AsSpan().StartsWith([0xFF, 0xFE])) return Encoding.Unicode.GetString(content, 2, content.Length - 2);
-        if (content.AsSpan().StartsWith([0xFE, 0xFF])) return Encoding.BigEndianUnicode.GetString(content, 2, content.Length - 2);
+        if (content.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF })) return Encoding.UTF8.GetString(content, 3, content.Length - 3);
+        if (content.AsSpan().StartsWith(new byte[] { 0xFF, 0xFE })) return Encoding.Unicode.GetString(content, 2, content.Length - 2);
+        if (content.AsSpan().StartsWith(new byte[] { 0xFE, 0xFF })) return Encoding.BigEndianUnicode.GetString(content, 2, content.Length - 2);
         return Encoding.UTF8.GetString(content);
     }
 }
-
