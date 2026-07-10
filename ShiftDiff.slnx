@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ShiftDiff.App/ShiftDiff.App.csproj" />
     <Project Path="src/ShiftDiff.Cli/ShiftDiff.Cli.csproj" />
     <Project Path="src/ShiftDiff.Core/ShiftDiff.Core.csproj" />
   </Folder>
@@ -8,3 +9,4 @@
     <Project Path="tests/ShiftDiff.Cli.Tests/ShiftDiff.Cli.Tests.csproj" />
   </Folder>
 </Solution>
+

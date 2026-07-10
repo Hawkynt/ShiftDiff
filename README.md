@@ -93,25 +93,34 @@ and apply a unified diff patch to a source file — but it calls the plain line
 differ directly, not the semantic engine, so it doesn't yet surface moved
 blocks or confidence levels (see the Example above).
 
-**Not built yet:** the desktop UI and direct Git/SVN repository integration.
-See SPEC.md §8.4/§12 for the planned CLI surface and §17 for MVP scope.
+The **desktop UI** (`ShiftDiff.App`) now provides a two-pane source comparison workflow,
+drag-and-drop/open-file loading, change navigation, moved-block details, comparison
+settings, and dark/light themes. Source files are detected and tokenized using
+language profiles for C#, JavaScript/TypeScript, Java, C/C++, Python, Go, Rust,
+PHP, Perl, Ruby, Visual Basic, HTML, CSS, and SQL.
+
+**Not built yet:** direct Git/SVN repository integration and the full three/four-pane
+merge UI. See SPEC.md §8.4/§12 for the planned CLI surface and §17 for MVP scope.
 
 ## Layout
 
 - `src/ShiftDiff.Core` — diff engine (hashing, anchor detection, block
   matching, patch parsing/application). No UI or VCS dependencies.
 - `src/ShiftDiff.Cli` — command-line entry point (two-way/three-way compare, patch apply).
+- `src/ShiftDiff.App` — Avalonia desktop UI for source-aware two-way comparison.
 - `tests/ShiftDiff.Core.Tests` — xunit tests for the core engine.
 - `tests/ShiftDiff.Cli.Tests` — xunit tests for the CLI.
 
-UI project (Avalonia) and VCS-integration project are added once the core
-engine covers enough of section 8.2/8.3 of the spec to be worth wrapping.
+Language profiles live in `ShiftDiff.Core` and are independent of the Avalonia UI.
+See [source language support](docs/source-language-support.md) for the extension model.
+The VCS-integration project remains planned.
 
 ## Building
 
 ```
 dotnet build
 dotnet test
+dotnet run --project src/ShiftDiff.App -- old.cs new.cs
 ```
 
 ## Workflow
