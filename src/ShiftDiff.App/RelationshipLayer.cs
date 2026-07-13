@@ -34,14 +34,17 @@ public sealed class RelationshipLayer : Control
                 _ => Color.Parse("#68B984"),
             };
             var translucent = Color.FromArgb(184, color.R, color.G, color.B);
-            var pen = new Pen(new SolidColorBrush(translucent), link.Kind == "folder" ? 2.5 : 1.5);
+            var pen = new Pen(new SolidColorBrush(translucent), link.Kind == "folder" ? 2.25 : 1.35);
             var source = new Point((link.SourcePane + 1) * paneWidth - 5, ClampPosition(link.SourcePosition) * Bounds.Height);
             var target = new Point(link.TargetPane * paneWidth + 5, ClampPosition(link.TargetPosition) * Bounds.Height);
-            var middle = (source.X + target.X) / 2;
 
-            context.DrawLine(pen, source, new Point(middle, source.Y));
-            context.DrawLine(pen, new Point(middle, source.Y), new Point(middle, target.Y));
-            context.DrawLine(pen, new Point(middle, target.Y), target);
+            // Araxis-style relationship threads favor a direct visual trajectory.
+            // Short horizontal caps keep endpoints legible without covering text.
+            var sourceCap = new Point(source.X + 7, source.Y);
+            var targetCap = new Point(target.X - 7, target.Y);
+            context.DrawLine(pen, source, sourceCap);
+            context.DrawLine(pen, sourceCap, targetCap);
+            context.DrawLine(pen, targetCap, target);
         }
     }
 

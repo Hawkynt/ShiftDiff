@@ -2,99 +2,199 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:ShiftDiff.App"
         x:Class="ShiftDiff.App.MainWindow"
-        Title="ShiftDiff — semantic comparison workspace"
-        Width="1560"
-        Height="960"
-        MinWidth="1040"
-        MinHeight="680"
+        Title="Folder comparison — ShiftDiff"
+        Width="1700"
+        Height="1020"
+        MinWidth="1120"
+        MinHeight="720"
         Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
-  <Grid RowDefinitions="Auto,Auto,2*,6,3*,Auto">
+  <Window.Styles>
+    <Style Selector="Button.ribbonLarge">
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="MinWidth" Value="74" />
+      <Setter Property="MinHeight" Value="70" />
+    </Style>
+    <Style Selector="Button.ribbonSmall">
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="29" />
+    </Style>
+    <Style Selector="Button.compact">
+      <Setter Property="Padding" Value="7,3" />
+      <Setter Property="MinHeight" Value="25" />
+    </Style>
+    <Style Selector="TextBlock.sectionLabel">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Opacity" Value="0.58" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,2*,5,3*,Auto">
+    <!-- Araxis-style command ribbon: dense, grouped, and task oriented. -->
     <Border Grid.Row="0"
             Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
             BorderThickness="0,0,0,1"
-            Padding="12,9">
-      <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="18">
-        <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Border Background="#6F5BE7" CornerRadius="6" Padding="8,5">
-            <TextBlock Text="SD" Foreground="White" FontWeight="Bold" />
-          </Border>
-          <StackPanel>
-            <TextBlock Text="ShiftDiff" FontSize="18" FontWeight="SemiBold" />
-            <TextBlock Text="Files, folders and interactive merge" FontSize="11" Opacity="0.65" />
+            Padding="8,6">
+      <Grid ColumnDefinitions="Auto,1,Auto,1,Auto,1,Auto,*,Auto" ColumnSpacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Button Classes="ribbonLarge" Click="OnOpenFiles" ToolTip.Tip="Start a two-to-four file comparison">
+            <StackPanel HorizontalAlignment="Center" Spacing="1">
+              <TextBlock Text="＋▤" FontSize="23" Foreground="#2587C8" HorizontalAlignment="Center" />
+              <TextBlock Text="New text" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <TextBlock Text="comparison" FontSize="10" Opacity="0.65" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="ribbonLarge" Click="OnOpenFolders" ToolTip.Tip="Start a two-to-four folder comparison">
+            <StackPanel HorizontalAlignment="Center" Spacing="1">
+              <TextBlock Text="＋▰" FontSize="23" Foreground="#D7A535" HorizontalAlignment="Center" />
+              <TextBlock Text="New folder" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <TextBlock Text="comparison" FontSize="10" Opacity="0.65" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <Border Grid.Column="1" Width="1" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="2,4" />
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+          <Button Classes="ribbonLarge" Click="OnRecompare" ToolTip.Tip="Reload and compare the current sources">
+            <StackPanel HorizontalAlignment="Center" Spacing="2">
+              <TextBlock Text="↻" FontSize="30" Foreground="#2587C8" HorizontalAlignment="Center" />
+              <TextBlock Text="Recompare" FontWeight="SemiBold" />
+            </StackPanel>
+          </Button>
+          <Button Classes="ribbonLarge" IsEnabled="False" Opacity="0.45">
+            <StackPanel HorizontalAlignment="Center" Spacing="2">
+              <TextBlock Text="×" FontSize="30" Foreground="#D36A70" HorizontalAlignment="Center" />
+              <TextBlock Text="Stop" FontWeight="SemiBold" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <Border Grid.Column="3" Width="1" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="2,4" />
+
+        <Grid Grid.Column="4" RowDefinitions="*,Auto" MinWidth="175">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+            <Button Classes="ribbonSmall" Content="↑  Previous change" Click="OnPreviousChange" />
+            <Button Classes="ribbonSmall" Content="↓  Next change" Click="OnNextChange" />
           </StackPanel>
-        </StackPanel>
+          <TextBlock Grid.Row="1" Text="Navigate" Classes="sectionLabel" HorizontalAlignment="Center" />
+        </Grid>
 
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-          <Button Content="Files…" ToolTip.Tip="Start a 2–4 file comparison" Click="OnOpenFiles" />
-          <Button Content="Folders…" ToolTip.Tip="Start a 2–4 folder comparison" Click="OnOpenFolders" />
-          <Button Content="Recompare" Click="OnRecompare" />
-        </StackPanel>
+        <Border Grid.Column="5" Width="1" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="2,4" />
 
-        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
-          <Button Content="Previous" Click="OnPreviousChange" />
-          <Button Content="Next" Click="OnNextChange" />
-          <Separator Width="1" Margin="5,2" />
-          <Button Content="Undo merge" Click="OnUndoMerge" />
-          <Button Content="Export target…" Classes="accent" Click="OnExportTarget" />
-        </StackPanel>
+        <Grid Grid.Column="6" RowDefinitions="*,Auto" MinWidth="245">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+            <Button Classes="ribbonSmall" Content="↶  Undo merge" Click="OnUndoMerge" />
+            <Button Classes="ribbonSmall accent" Content="⇥  Export target…" Click="OnExportTarget" />
+          </StackPanel>
+          <TextBlock Grid.Row="1" Text="Merge result" Classes="sectionLabel" HorizontalAlignment="Center" />
+        </Grid>
 
-        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-          <TextBlock Text="Theme" Margin="0,0,5,0" Opacity="0.65" VerticalAlignment="Center" />
-          <Button Content="Light" Click="OnLightTheme" Padding="8,4" />
-          <Button Content="System" Click="OnSystemTheme" Padding="8,4" />
-          <Button Content="Dark" Click="OnDarkTheme" Padding="8,4" />
+        <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+          <StackPanel Margin="0,0,7,0">
+            <TextBlock Text="THEME" Classes="sectionLabel" HorizontalAlignment="Center" />
+            <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,5,0,0">
+              <Button Content="Light" Click="OnLightTheme" Classes="compact" />
+              <Button Content="System" Click="OnSystemTheme" Classes="compact" />
+              <Button Content="Dark" Click="OnDarkTheme" Classes="compact" />
+            </StackPanel>
+          </StackPanel>
+          <Border Background="#6759E8" CornerRadius="5" Padding="9,7">
+            <StackPanel>
+              <TextBlock Text="SD" Foreground="White" FontSize="17" FontWeight="Bold" HorizontalAlignment="Center" />
+              <TextBlock Text="ShiftDiff" Foreground="White" FontSize="10" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Border>
         </StackPanel>
       </Grid>
     </Border>
 
+    <!-- Comparison tabs mirror the established Araxis workflow vocabulary. -->
     <Border Grid.Row="1"
-            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}"
+            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Margin="8,0,0,0">
+        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1,0,1,0"
+                Padding="13,7">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <TextBlock Text="▰" Foreground="#D7A535" />
+            <TextBlock Text="Folder comparison" FontWeight="Bold" />
+          </StackPanel>
+        </Border>
+        <Border Padding="13,7" Opacity="0.72">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <TextBlock Text="▤" Foreground="#2587C8" />
+            <TextBlock Text="Selected source files" />
+          </StackPanel>
+        </Border>
+        <Border Padding="13,7" Opacity="0.55">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <TextBlock Text="⇥" Foreground="#4AAE73" />
+            <TextBlock Text="Merge target" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- Per-pane path bars sit where Araxis users expect them. -->
+    <Border Grid.Row="2"
+            Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
             BorderThickness="0,0,0,1"
-            Padding="12,7"
+            Padding="9,6"
             DragDrop.AllowDrop="True">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <TextBlock Text="SOURCES" FontSize="11" FontWeight="Bold" Opacity="0.55" VerticalAlignment="Center" />
-        <ItemsControl Grid.Column="1" ItemsSource="{Binding Panes}" Margin="14,0">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+        <ItemsControl ItemsSource="{Binding Panes}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="8" />
+              <UniformGrid Rows="1" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Border Background="{Binding AccentBackground}" CornerRadius="5" Padding="9,5" MaxWidth="330">
-                <StackPanel Orientation="Horizontal" Spacing="7">
-                  <TextBlock Text="{Binding Ordinal}" FontWeight="Bold" Foreground="{Binding AccentForeground}" />
-                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding RootPath}" Opacity="0.58" TextTrimming="CharacterEllipsis" MaxWidth="210" />
-                </StackPanel>
-              </Border>
+              <Grid ColumnDefinitions="Auto,*" Margin="2,0">
+                <Border Background="{Binding AccentBackground}" BorderBrush="{Binding AccentForeground}" BorderThickness="1" CornerRadius="3,0,0,3" Padding="7,5">
+                  <TextBlock Text="{Binding Ordinal}" Foreground="{Binding AccentForeground}" FontWeight="Bold" />
+                </Border>
+                <Border Grid.Column="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="0,3,3,0" Padding="8,5">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding RootPath}" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="⋯  ▾" Opacity="0.55" Margin="8,0,0,0" />
+                  </Grid>
+                </Border>
+              </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <ComboBox x:Name="WhitespaceSelector" Width="125" />
-          <ComboBox x:Name="DetectionSelector" Width="120" />
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+          <ComboBox x:Name="WhitespaceSelector" Width="128" ToolTip.Tip="Whitespace handling" />
+          <ComboBox x:Name="DetectionSelector" Width="122" ToolTip.Tip="Move detection mode" />
           <CheckBox x:Name="IgnoreCaseCheck" Content="Ignore case" VerticalAlignment="Center" />
         </StackPanel>
       </Grid>
     </Border>
 
-    <Border Grid.Row="2"
-            Margin="10,10,10,0"
+    <Border Grid.Row="3"
+            Margin="8,8,8,0"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
             BorderThickness="1"
-            CornerRadius="6"
             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
       <Grid RowDefinitions="Auto,*">
-        <Grid Margin="10,7" ColumnDefinitions="*,Auto">
+        <Grid Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="8,5" ColumnDefinitions="*,Auto">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="FOLDER VIEW" FontSize="11" FontWeight="Bold" Opacity="0.55" />
-            <TextBlock x:Name="FolderSummaryText" Text="Drop or open two to four folders/files" Opacity="0.75" />
+            <TextBlock Text="FOLDER COMPARISON" Classes="sectionLabel" VerticalAlignment="Center" />
+            <TextBlock x:Name="FolderSummaryText" Text="Open or drop two to four folders/files" VerticalAlignment="Center" />
           </StackPanel>
-          <TextBlock Grid.Column="1" Text="Purple: moved folder · Green: moved file · Amber: moved + edited" FontSize="11" Opacity="0.55" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="11">
+            <TextBlock Text="■ moved folder" Foreground="#9B7BEA" FontSize="10" />
+            <TextBlock Text="■ moved file" Foreground="#68B984" FontSize="10" />
+            <TextBlock Text="■ moved + edited" Foreground="#E0B55B" FontSize="10" />
+          </StackPanel>
         </Grid>
 
         <Grid Grid.Row="1">
@@ -107,14 +207,23 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,1,0">
-                  <Grid RowDefinitions="Auto,*">
-                    <Border Background="{Binding AccentBackground}" Padding="9,5">
+                  <Grid RowDefinitions="Auto,Auto,*">
+                    <Border Background="{Binding AccentBackground}" Padding="8,5">
                       <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" Text="{Binding FolderChangeCount}" Opacity="0.65" />
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                          <TextBlock Text="▰" Foreground="{Binding AccentForeground}" />
+                          <TextBlock Text="{Binding Title}" FontWeight="Bold" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding FolderChangeCount}" FontWeight="SemiBold" />
                       </Grid>
                     </Border>
-                    <ListBox Grid.Row="1"
+                    <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,0,1" Padding="8,3">
+                      <Grid ColumnDefinitions="*,95">
+                        <TextBlock Text="Folder / file" FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Changes" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                      </Grid>
+                    </Border>
+                    <ListBox Grid.Row="2"
                              ItemsSource="{Binding FolderRows}"
                              SelectedItem="{Binding SelectedFolderRow}"
                              SelectionChanged="OnFolderSelectionChanged"
@@ -122,11 +231,11 @@
                              Background="Transparent">
                       <ListBox.ItemTemplate>
                         <DataTemplate>
-                          <Border Background="{Binding Background}" Padding="8,4" MinHeight="25">
-                            <Grid ColumnDefinitions="24,*,Auto">
-                              <TextBlock Text="{Binding Icon}" Opacity="0.75" />
+                          <Border Background="{Binding Background}" Padding="7,3" MinHeight="24">
+                            <Grid ColumnDefinitions="22,*,100">
+                              <TextBlock Text="{Binding Icon}" Opacity="0.78" HorizontalAlignment="Center" />
                               <TextBlock Grid.Column="1" Text="{Binding DisplayPath}" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
-                              <TextBlock Grid.Column="2" Text="{Binding Status}" Foreground="{Binding StatusForeground}" Margin="8,0,0,0" />
+                              <TextBlock Grid.Column="2" Text="{Binding Status}" Foreground="{Binding StatusForeground}" HorizontalAlignment="Right" />
                             </Grid>
                           </Border>
                         </DataTemplate>
@@ -142,20 +251,19 @@
       </Grid>
     </Border>
 
-    <GridSplitter Grid.Row="3" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+    <GridSplitter Grid.Row="4" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="8,0" />
 
-    <Grid Grid.Row="4" Margin="10,0,10,10" ColumnDefinitions="*,330" ColumnSpacing="8">
+    <Grid Grid.Row="5" Margin="8,0,8,8" ColumnDefinitions="*,340" ColumnSpacing="6">
       <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
               BorderThickness="1"
-              CornerRadius="6"
               Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
         <Grid RowDefinitions="Auto,*">
-          <Grid Margin="10,7" ColumnDefinitions="*,Auto">
+          <Grid Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="8,5" ColumnDefinitions="*,Auto">
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="FILE / BLOCK VIEW" FontSize="11" FontWeight="Bold" Opacity="0.55" />
-              <TextBlock x:Name="FileSummaryText" Text="Select a file above" Opacity="0.75" />
+              <TextBlock Text="TEXT COMPARISON" Classes="sectionLabel" VerticalAlignment="Center" />
+              <TextBlock x:Name="FileSummaryText" Text="Select a file above" VerticalAlignment="Center" />
             </StackPanel>
-            <TextBlock Grid.Column="1" Text="Select a source line, then insert or replace its semantic block" FontSize="11" Opacity="0.55" />
+            <TextBlock Grid.Column="1" Text="Select a changed line, then take its block into the target" FontSize="10" Opacity="0.62" />
           </Grid>
 
           <Grid Grid.Row="1">
@@ -168,33 +276,46 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,1,0">
-                    <Grid RowDefinitions="Auto,*,Auto">
-                      <Border Background="{Binding AccentBackground}" Padding="8,5">
-                        <TextBlock Text="{Binding SelectedPath}" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
+                    <Grid RowDefinitions="Auto,Auto,*,Auto">
+                      <Border Background="{Binding AccentBackground}" Padding="7,4">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <TextBlock Text="{Binding Ordinal}" Foreground="{Binding AccentForeground}" FontWeight="Bold" Margin="0,0,7,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding SelectedPath}" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="2" Text="⋯  ▾" Opacity="0.55" />
+                        </Grid>
                       </Border>
-                      <ListBox Grid.Row="1"
+                      <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="5,2" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,0,1">
+                        <Grid ColumnDefinitions="23,42,*">
+                          <TextBlock Text="Δ" FontSize="10" Opacity="0.55" HorizontalAlignment="Center" />
+                          <TextBlock Grid.Column="1" Text="Ln" FontSize="10" Opacity="0.55" HorizontalAlignment="Right" Margin="0,0,7,0" />
+                          <TextBlock Grid.Column="2" Text="Source" FontSize="10" Opacity="0.55" />
+                        </Grid>
+                      </Border>
+                      <ListBox Grid.Row="2"
                                ItemsSource="{Binding Lines}"
                                SelectedItem="{Binding SelectedLine}"
                                BorderThickness="0"
                                Background="Transparent">
                         <ListBox.ItemTemplate>
                           <DataTemplate>
-                            <Border Background="{Binding Background}" Padding="4,2" MinHeight="22">
-                              <Grid ColumnDefinitions="24,42,*">
+                            <Border Background="{Binding Background}" Padding="3,2" MinHeight="22">
+                              <Grid ColumnDefinitions="23,42,*">
                                 <TextBlock Text="{Binding Marker}" Foreground="{Binding MarkerForeground}" HorizontalAlignment="Center" FontWeight="Bold" />
-                                <TextBlock Grid.Column="1" Text="{Binding Number}" HorizontalAlignment="Right" Margin="0,0,8,0" Opacity="0.48" FontFamily="monospace" />
+                                <TextBlock Grid.Column="1" Text="{Binding Number}" HorizontalAlignment="Right" Margin="0,0,7,0" Opacity="0.48" FontFamily="monospace" />
                                 <TextBlock Grid.Column="2" Text="{Binding Text}" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
                               </Grid>
                             </Border>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
-                      <Border Grid.Row="2" Padding="6" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
-                          <TextBlock Text="{Binding SelectedBlockLabel}" VerticalAlignment="Center" Opacity="0.6" Margin="0,0,5,0" />
-                          <Button Content="Insert block →" Click="OnInsertBlock" Padding="7,3" />
-                          <Button Content="Replace target →" Click="OnReplaceBlock" Padding="7,3" />
-                        </StackPanel>
+                      <Border Grid.Row="3" Padding="5" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,0,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Text="{Binding SelectedBlockLabel}" VerticalAlignment="Center" Opacity="0.65" />
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                            <Button Content="Insert →" Click="OnInsertBlock" Classes="compact" ToolTip.Tip="Insert selected source block after the target selection" />
+                            <Button Content="Replace →" Click="OnReplaceBlock" Classes="compact" ToolTip.Tip="Replace target lines with the selected source block" />
+                          </StackPanel>
+                        </Grid>
                       </Border>
                     </Grid>
                   </Border>
@@ -207,24 +328,29 @@
       </Border>
 
       <Border Grid.Column="1"
-              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+              BorderBrush="{DynamicResource SystemControlHighlightAccentBrush}"
               BorderThickness="1"
-              CornerRadius="6"
               Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
-        <Grid RowDefinitions="Auto,*,Auto">
-          <Border Padding="10,7" Background="{DynamicResource SystemControlHighlightAccentBrush}">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <Border Background="{DynamicResource SystemControlHighlightAccentBrush}" Padding="8,5">
             <Grid ColumnDefinitions="*,Auto">
-              <StackPanel>
-                <TextBlock Text="MERGE TARGET" FontSize="11" FontWeight="Bold" />
-                <TextBlock x:Name="TargetPathText" Text="Reconstructed result" FontFamily="monospace" Opacity="0.72" />
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <TextBlock Text="⇥" FontSize="17" FontWeight="Bold" />
+                <TextBlock Text="MERGE TARGET" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
               </StackPanel>
-              <TextBlock Grid.Column="1" Text="editable by blocks" VerticalAlignment="Center" Opacity="0.65" />
+              <TextBlock Grid.Column="1" Text="result" FontSize="10" Opacity="0.7" VerticalAlignment="Center" />
             </Grid>
           </Border>
-          <ListBox x:Name="MergeTargetList" Grid.Row="1" ItemsSource="{Binding MergeLines}" BorderThickness="0" Background="Transparent">
+          <Border Grid.Row="1" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1" Padding="7,4">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock x:Name="TargetPathText" Text="Reconstructed result" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="1" Text="⋯  ▾" Opacity="0.55" />
+            </Grid>
+          </Border>
+          <ListBox x:Name="MergeTargetList" Grid.Row="2" ItemsSource="{Binding MergeLines}" BorderThickness="0" Background="Transparent">
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <Border Background="{Binding Background}" Padding="5,2" MinHeight="22">
+                <Border Background="{Binding Background}" Padding="4,2" MinHeight="22">
                   <Grid ColumnDefinitions="42,*">
                     <TextBlock Text="{Binding Number}" HorizontalAlignment="Right" Margin="0,0,8,0" Opacity="0.48" FontFamily="monospace" />
                     <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="monospace" TextTrimming="CharacterEllipsis" />
@@ -233,23 +359,23 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
-          <Border Grid.Row="2" Padding="8" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
-            <TextBlock x:Name="MergeStatusText" Text="No merge edits" Opacity="0.65" />
+          <Border Grid.Row="3" Padding="7,5" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,1,0,0">
+            <TextBlock x:Name="MergeStatusText" Text="No merge edits" Opacity="0.68" />
           </Border>
         </Grid>
       </Border>
     </Grid>
 
-    <Border Grid.Row="5"
+    <Border Grid.Row="6"
             Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
             BorderThickness="0,1,0,0"
-            Padding="12,6">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock x:Name="StatusText" Text="Ready — open or drop two to four files/folders" Opacity="0.72" />
-        <ProgressBar x:Name="BusyIndicator" Grid.Column="1" Width="130" IsIndeterminate="True" IsVisible="False" />
+            Padding="9,5">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="14">
+        <TextBlock x:Name="StatusText" Text="Ready — open or drop two to four files/folders" />
+        <TextBlock Grid.Column="1" Text="UTF-8  ·  semantic moves  ·  safe target export" Opacity="0.58" />
+        <ProgressBar x:Name="BusyIndicator" Grid.Column="2" Width="130" IsIndeterminate="True" IsVisible="False" />
       </Grid>
     </Border>
   </Grid>
 </Window>
-
