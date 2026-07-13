@@ -307,8 +307,8 @@ public sealed partial class MainWindow : Window
                     links.Add(new VisualRelationship(
                         reference.Index,
                         target.Index,
-                        Position(block.OldStart, reference.RawLines.Length),
-                        Position(block.NewStart, target.RawLines.Length),
+                        LinePosition(block.OldStart, reference.RawLines.Length),
+                        LinePosition(block.NewStart, target.RawLines.Length),
                         "block"));
                 }
             }
@@ -410,7 +410,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static double Position(int line, int lineCount) => (line + 0.5) / Math.Max(1, lineCount);
+    private static double LinePosition(int line, int lineCount) => (line + 0.5) / Math.Max(1, lineCount);
 
     private void OnInsertBlock(object? sender, RoutedEventArgs e)
     {
@@ -739,4 +739,3 @@ internal static class Palette
 
     private static IBrush Brush(string color) => new SolidColorBrush(Color.Parse(color));
 }
-

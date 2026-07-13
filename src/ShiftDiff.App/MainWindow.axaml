@@ -185,17 +185,19 @@
             BorderThickness="1"
             Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
       <Grid RowDefinitions="Auto,*">
-        <Grid Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="8,5" ColumnDefinitions="*,Auto">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="FOLDER COMPARISON" Classes="sectionLabel" VerticalAlignment="Center" />
-            <TextBlock x:Name="FolderSummaryText" Text="Open or drop two to four folders/files" VerticalAlignment="Center" />
-          </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="11">
-            <TextBlock Text="■ moved folder" Foreground="#9B7BEA" FontSize="10" />
-            <TextBlock Text="■ moved file" Foreground="#68B984" FontSize="10" />
-            <TextBlock Text="■ moved + edited" Foreground="#E0B55B" FontSize="10" />
-          </StackPanel>
-        </Grid>
+        <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="8,5">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="FOLDER COMPARISON" Classes="sectionLabel" VerticalAlignment="Center" />
+              <TextBlock x:Name="FolderSummaryText" Text="Open or drop two to four folders/files" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="11">
+              <TextBlock Text="■ moved folder" Foreground="#9B7BEA" FontSize="10" />
+              <TextBlock Text="■ moved file" Foreground="#68B984" FontSize="10" />
+              <TextBlock Text="■ moved + edited" Foreground="#E0B55B" FontSize="10" />
+            </StackPanel>
+          </Grid>
+        </Border>
 
         <Grid Grid.Row="1">
           <ItemsControl ItemsSource="{Binding Panes}">
@@ -258,13 +260,15 @@
               BorderThickness="1"
               Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
         <Grid RowDefinitions="Auto,*">
-          <Grid Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="8,5" ColumnDefinitions="*,Auto">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="TEXT COMPARISON" Classes="sectionLabel" VerticalAlignment="Center" />
-              <TextBlock x:Name="FileSummaryText" Text="Select a file above" VerticalAlignment="Center" />
-            </StackPanel>
-            <TextBlock Grid.Column="1" Text="Select a changed line, then take its block into the target" FontSize="10" Opacity="0.62" />
-          </Grid>
+          <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" Padding="8,5">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="TEXT COMPARISON" Classes="sectionLabel" VerticalAlignment="Center" />
+                <TextBlock x:Name="FileSummaryText" Text="Select a file above" VerticalAlignment="Center" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Text="Select a changed line, then take its block into the target" FontSize="10" Opacity="0.62" />
+            </Grid>
+          </Border>
 
           <Grid Grid.Row="1">
             <ItemsControl ItemsSource="{Binding Panes}">
