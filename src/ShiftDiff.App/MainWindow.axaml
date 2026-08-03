@@ -226,33 +226,57 @@
                               Classes.moved="{Binding IsMoved}"
                               Classes.conflict="{Binding IsConflict}"
                               Classes.empty="{Binding IsEmpty}"
-                              BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1,0,0,0">
+                              Classes.lastpane="{Binding IsLastPane}">
                         <Grid ColumnDefinitions="52,*">
                           <Border Classes="linegutter">
                             <TextBlock Classes="linenumber" Text="{Binding LineNumberText}" Margin="0,1,7,1" />
                           </Border>
-                          <ItemsControl Grid.Column="1" ItemsSource="{Binding Segments}" Margin="2,1,0,1">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                              </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate>
-                                <Border Classes="run"
-                                        Classes.added="{Binding IsAdded}"
-                                        Classes.removed="{Binding IsRemoved}">
-                                  <TextBlock Classes="seg"
-                                             Classes.keyword="{Binding IsKeyword}"
-                                             Classes.str="{Binding IsString}"
-                                             Classes.comment="{Binding IsComment}"
-                                             Classes.number="{Binding IsNumber}"
-                                             Classes.op="{Binding IsOperator}"
-                                             Text="{Binding Text}" />
-                                </Border>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
+
+                          <!-- Araxis-style block box: the outline is drawn once
+                               around the whole run of changed rows. -->
+                          <Border Grid.Column="1" Classes="blockbox"
+                                  Classes.added="{Binding IsAdded}"
+                                  Classes.removed="{Binding IsRemoved}"
+                                  Classes.edited="{Binding IsEdited}"
+                                  Classes.moved="{Binding IsMoved}"
+                                  Classes.conflict="{Binding IsConflict}"
+                                  Classes.single="{Binding IsBlockSingle}"
+                                  Classes.first="{Binding IsBlockFirst}"
+                                  Classes.mid="{Binding IsBlockMiddle}"
+                                  Classes.last="{Binding IsBlockLast}">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <ItemsControl ItemsSource="{Binding Segments}" Margin="3,1,0,1">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                  </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate>
+                                    <Border Classes="run"
+                                            Classes.added="{Binding IsAdded}"
+                                            Classes.removed="{Binding IsRemoved}">
+                                      <TextBlock Classes="seg"
+                                                 Classes.keyword="{Binding IsKeyword}"
+                                                 Classes.str="{Binding IsString}"
+                                                 Classes.comment="{Binding IsComment}"
+                                                 Classes.number="{Binding IsNumber}"
+                                                 Classes.op="{Binding IsOperator}"
+                                                 Text="{Binding Text}" />
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+
+                              <!-- In-place transfer: copies this block into the
+                                   reconstructed result (FR-047). -->
+                              <Button Grid.Column="1" Classes="transfer"
+                                      Content="{Binding TransferGlyph}"
+                                      IsVisible="{Binding CanTransfer}"
+                                      ToolTip.Tip="{Binding TransferTip}"
+                                      Click="OnTransferBlock" />
+                            </Grid>
+                          </Border>
                         </Grid>
                       </Border>
                     </DataTemplate>

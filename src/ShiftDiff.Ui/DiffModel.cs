@@ -25,6 +25,16 @@ public enum CellState
     Conflict,
 }
 
+/// <summary>Where a row sits inside its change block, so a pane can draw the box around it.</summary>
+public enum BlockEdge
+{
+    None,
+    Single,
+    First,
+    Middle,
+    Last,
+}
+
 public enum DiffRowKind
 {
     Line,
@@ -53,9 +63,33 @@ public sealed record DiffSegment(string Text, DiffSegmentKind Kind, SourceTokenK
     public bool IsOperator => Syntax is SourceTokenKind.Operator or SourceTokenKind.Punctuation;
 }
 
-public sealed record DiffCell(int? LineNumber, IReadOnlyList<DiffSegment> Segments, CellState State)
+public sealed record DiffCell(
+    int? LineNumber,
+    IReadOnlyList<DiffSegment> Segments,
+    CellState State,
+    int PaneIndex = 0,
+    int? BlockId = null,
+    BlockEdge Edge = BlockEdge.None,
+    bool CanTransfer = false,
+    string TransferGlyph = "",
+    string TransferTip = "")
 {
     public static DiffCell Empty { get; } = new(null, [], CellState.Empty);
+
+    public bool IsBlockStart => Edge is BlockEdge.First or BlockEdge.Single;
+
+    public bool IsBlockSingle => Edge == BlockEdge.Single;
+
+    public bool IsBlockFirst => Edge == BlockEdge.First;
+
+    public bool IsBlockMiddle => Edge == BlockEdge.Middle;
+
+    public bool IsBlockLast => Edge == BlockEdge.Last;
+
+    public bool IsInBlock => Edge != BlockEdge.None;
+
+    /// <summary>The rightmost pane draws no divider gutter after it.</summary>
+    public bool IsLastPane { get; init; }
 
     public string Text => string.Concat(Segments.Select(segment => segment.Text));
 
@@ -83,7 +117,9 @@ public sealed record DiffRow(
     int HiddenLineCount = 0,
     int? MovedBlockId = null,
     int? OldIndex = null,
-    int? NewIndex = null)
+    int? NewIndex = null,
+    int? BlockId = null,
+    BlockEdge Edge = BlockEdge.None)
 {
     public bool IsChanged => Kind == DiffRowKind.Line && (ChangeType != ChangeType.Unchanged || IsMoved);
 
@@ -160,5 +196,19 @@ public sealed record DiffSummary(
 /// <summary>One stripe of the overview bar / minimap, positioned in normalized 0..1 document space.</summary>
 public sealed record OverviewStripe(double Start, double End, ChangeType ChangeType, int RowIndex);
 
-/// <summary>A thread drawn between two panes, connecting the two ends of one relocated block.</summary>
-public sealed record PaneLink(int SourcePane, int TargetPane, int SourceRow, int TargetRow, ChangeType Kind);
+/// <summary>
+/// A ribbon drawn in the gutter between two panes, joining the rows one change
+/// block occupies on each side. Aligned blocks give a straight band; a relocated
+/// block gives a sloped one.
+/// </summary>
+public sealed record PaneLink(
+    int SourcePane,
+    int TargetPane,
+    int SourceStartRow,
+    int SourceEndRow,
+    int TargetStartRow,
+    int TargetEndRow,
+    ChangeType Kind)
+{
+    public bool IsRelocation => Kind is ChangeType.Moved or ChangeType.MovedEdited;
+}

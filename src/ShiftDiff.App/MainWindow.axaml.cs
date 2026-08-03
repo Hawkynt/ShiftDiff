@@ -9,6 +9,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ShiftDiff.App.Controls;
 using ShiftDiff.Core;
@@ -29,6 +30,9 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<FileListEntry> _files = [];
     private readonly ObservableCollection<MovedBlockInfo> _movedBlocks = [];
     private readonly ObservableCollection<DetailEntry> _detailEntries = [];
+    // Kept in step with the Border.cell padding in Styles.axaml.
+    private const double CellGutterWidth = 38;
+
     private ScrollViewer? _diffScroll;
     private bool _suppressSelection;
 
@@ -64,6 +68,7 @@ public sealed partial class MainWindow : Window
         DragDrop.AddDropHandler(this, OnDrop);
 
         DiffList.DoubleTapped += OnRowDoubleTapped;
+        DiffList.LayoutUpdated += (_, _) => UpdateRelationshipLinks();
 
         Opened += async (_, _) =>
         {
@@ -184,38 +189,103 @@ public sealed partial class MainWindow : Window
         }
 
         Relationships.PaneCount = Math.Max(2, _shell.PaneTitles.Count);
+        Relationships.GutterWidth = CellGutterWidth;
+        Relationships.PaneRightEdges = MeasurePaneEdges();
 
-        var rowHeight = _diffScroll is { Extent.Height: > 0 } ? _diffScroll.Extent.Height / _rows.Count : 0;
-        var viewport = _diffScroll?.Viewport.Height ?? Bounds.Height;
-        var offset = _diffScroll?.Offset.Y ?? 0;
-        if (rowHeight <= 0 || viewport <= 0)
-        {
-            Relationships.Links = [];
-            return;
-        }
+        // Positions come from a realised row container rather than from the
+        // scroll extent: the extent covers the whole viewport even when the
+        // document is shorter, which would drift the ribbons down the page.
+        // While the list is being re-templated (a theme switch, for instance) no
+        // row is realised; the previous ribbons stay on screen until it settles
+        // rather than blinking out.
+        var metrics = MeasureRows();
+        if (metrics is not var (referenceIndex, referenceTop, rowHeight) || rowHeight <= 0) return;
+
+        var height = Relationships.Bounds.Height;
+        if (height <= 0) return;
 
         var links = new List<VisualRelationship>();
         foreach (var link in _shell.Links)
         {
-            var source = PositionOf(link.SourceRow);
-            var target = PositionOf(link.TargetRow);
+            var source = SpanOf(link.SourceStartRow, link.SourceEndRow);
+            var target = SpanOf(link.TargetStartRow, link.TargetEndRow);
             if (source is null || target is null) continue;
 
             links.Add(new VisualRelationship(
-                link.SourcePane, link.TargetPane, source.Value, target.Value,
-                link.Kind == ChangeType.MovedEdited ? "edited" : "block"));
+                link.SourcePane, link.TargetPane,
+                source.Value.Top, source.Value.Bottom,
+                target.Value.Top, target.Value.Bottom,
+                link.Kind, link.IsRelocation));
         }
 
         Relationships.Links = links;
 
-        double? PositionOf(int documentRow)
+        (double Top, double Bottom)? SpanOf(int firstRow, int lastRow)
         {
-            var visibleRow = VisibleIndexOfDocumentRow(documentRow);
-            if (visibleRow < 0) return null;
+            var first = VisibleIndexOfDocumentRow(firstRow);
+            var last = VisibleIndexOfDocumentRow(lastRow);
+            if (first < 0 || last < 0) return null;
 
-            var position = (visibleRow * rowHeight + rowHeight / 2 - offset) / viewport;
-            return position is >= -0.05 and <= 1.05 ? position : null;
+            var top = (referenceTop + (first - referenceIndex) * rowHeight) / height;
+            var bottom = (referenceTop + (last + 1 - referenceIndex) * rowHeight) / height;
+            return bottom < -0.2 || top > 1.2 ? null : (top, bottom);
         }
+    }
+
+    // Where each pane actually ends, taken from a laid-out row: the rows scroll
+    // horizontally, so they are usually wider than the visible area and the
+    // boundary is not simply half of it.
+    private IReadOnlyList<double> MeasurePaneEdges()
+    {
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            if (DiffList.ContainerFromIndex(i) is not { } container) continue;
+
+            var cells = container.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.Classes.Contains("cell"))
+                .ToArray();
+            if (cells.Length == 0) continue;
+
+            var edges = new List<double>(cells.Length);
+            foreach (var cell in cells)
+            {
+                if (cell.TranslatePoint(new Point(cell.Bounds.Width, 0), Relationships) is not { } edge) continue;
+                edges.Add(edge.X);
+            }
+
+            if (edges.Count == cells.Length) return edges;
+        }
+
+        return [];
+    }
+
+    // Index and viewport-relative top of a realised row, plus the row pitch.
+    // The pitch is derived from the distance between two realised rows rather
+    // than from one row's height, so a taller row (a folded region) cannot skew
+    // every ribbon below it.
+    private (int Index, double Top, double Pitch)? MeasureRows()
+    {
+        (int Index, double Top)? first = null;
+        (int Index, double Top)? last = null;
+
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            if (DiffList.ContainerFromIndex(i) is not { Bounds.Height: > 0 } container) continue;
+            if (container.TranslatePoint(new Point(0, 0), Relationships) is not { } origin) continue;
+
+            first ??= (i, origin.Y);
+            last = (i, origin.Y);
+        }
+
+        if (first is not { } start) return null;
+        if (last is not { } end || end.Index == start.Index)
+        {
+            var height = DiffList.ContainerFromIndex(start.Index)?.Bounds.Height ?? 0;
+            return height > 0 ? (start.Index, start.Top, height) : null;
+        }
+
+        return (start.Index, start.Top, (end.Top - start.Top) / (end.Index - start.Index));
     }
 
     private int VisibleIndexOfDocumentRow(int documentRow)
@@ -555,6 +625,9 @@ public sealed partial class MainWindow : Window
             ThemeMode.Light => ThemeVariant.Light,
             _ => ThemeVariant.Default,
         };
+
+        // Re-templating unrealises the rows the ribbons are measured against.
+        Dispatcher.UIThread.Post(UpdateRelationshipLinks, DispatcherPriority.Background);
     }
 
     private void OnFilterChanged(object? sender, SelectionChangedEventArgs e) =>
@@ -611,6 +684,16 @@ public sealed partial class MainWindow : Window
     {
         if (_suppressSelection) return;
         if (FileList.SelectedItem is FileListEntry entry) _shell.SelectedFile = entry;
+    }
+
+    // The arrow drawn on a change block: transfers exactly that block, without
+    // requiring it to be selected first.
+    private void OnTransferBlock(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: DiffCell cell } || cell.BlockId is not { } blockId) return;
+
+        if (!_shell.TakeBlock(blockId, cell.PaneIndex)) StatusText.Text = "That block cannot be transferred.";
+        UpdateMergeState();
     }
 
     private void OnMovedBlockSelected(object? sender, SelectionChangedEventArgs e)

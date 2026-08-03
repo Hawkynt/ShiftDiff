@@ -36,6 +36,7 @@ public static class DiffDocumentBuilder
         SpreadMovedFlagAcrossRuns(rows, syntax);
 
         var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 2, expandedRegions) : rows;
+        collapsed = MarkChangeBlocks(collapsed, 2);
         var movedBlocks = BuildMovedBlockInfos(blocks, collapsed);
         var summary = Summarize(comparison.Changes, blocks.Length, 0);
 
@@ -52,7 +53,8 @@ public static class DiffDocumentBuilder
         IReadOnlySet<int>? expandedRegions = null)
     {
         var rows = BuildThreeWayRows(changes, settings, language);
-        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 3, expandedRegions) : rows;
+        var collapsed = MarkChangeBlocks(
+            settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 3, expandedRegions) : rows, 3);
         var summary = SummarizeThreeWay(changes);
 
         return new DiffDocument(collapsed, [baseTitle, localTitle, remoteTitle], summary, [], language);
@@ -100,7 +102,8 @@ public static class DiffDocumentBuilder
             rows.Add(row with { Cells = [.. row.Cells, targetCell] });
         }
 
-        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 4, expandedRegions) : rows;
+        var collapsed = MarkChangeBlocks(
+            settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 4, expandedRegions) : rows, 4);
         var summary = SummarizeThreeWay(changes);
         return new DiffDocument(
             collapsed, [baseTitle, localTitle, remoteTitle, targetTitle], summary, [], language);
@@ -212,6 +215,86 @@ public static class DiffDocumentBuilder
                 rows[i] = rows[i] with { IsMoved = true, MovedBlockId = blockId, Cells = cells };
             }
         }
+    }
+
+    // Araxis-style change blocks: every run of consecutive changed rows becomes
+    // one identified block, each pane's cell knows where it sits inside the box,
+    // and the panes that are not the merge result carry a transfer arrow on the
+    // block's first row.
+    private static IReadOnlyList<DiffRow> MarkChangeBlocks(IReadOnlyList<DiffRow> rows, int paneCount)
+    {
+        var marked = rows.ToArray();
+
+        // The reconstructed result mirrors the second pane, so that is where a
+        // transferred block lands and the arrows point at it.
+        const int resultPane = 1;
+
+        var blockId = 0;
+        var index = 0;
+        while (index < marked.Length)
+        {
+            if (!marked[index].IsChanged)
+            {
+                marked[index] = WithPaneInfo(marked[index], paneCount);
+                index++;
+                continue;
+            }
+
+            var start = index;
+            while (index < marked.Length && marked[index].IsChanged) index++;
+
+            for (var row = start; row < index; row++)
+            {
+                var edge = (start == index - 1, row == start, row == index - 1) switch
+                {
+                    (true, _, _) => BlockEdge.Single,
+                    (_, true, _) => BlockEdge.First,
+                    (_, _, true) => BlockEdge.Last,
+                    _ => BlockEdge.Middle,
+                };
+
+                marked[row] = WithPaneInfo(
+                    marked[row] with { BlockId = blockId, Edge = edge }, paneCount, blockId, edge, resultPane);
+            }
+
+            blockId++;
+        }
+
+        return marked;
+    }
+
+    private static DiffRow WithPaneInfo(
+        DiffRow row, int paneCount, int? blockId = null, BlockEdge edge = BlockEdge.None, int resultPane = 1)
+    {
+        var cells = new DiffCell[row.Cells.Count];
+        for (var pane = 0; pane < row.Cells.Count; pane++)
+        {
+            var isLastPane = pane == row.Cells.Count - 1;
+            var canTransfer = blockId is not null
+                && edge is BlockEdge.First or BlockEdge.Single
+                && pane != resultPane
+                && paneCount > 1
+                && paneCount != 4;
+
+            // A pane with no line here still has a version of the block — the
+            // empty one — so taking it removes those lines from the result.
+            var removesLines = row.Cells[pane].State == CellState.Empty;
+
+            cells[pane] = row.Cells[pane] with
+            {
+                PaneIndex = pane,
+                BlockId = blockId,
+                Edge = edge,
+                CanTransfer = canTransfer,
+                TransferGlyph = pane < resultPane ? "▶" : "◀",
+                TransferTip = canTransfer
+                    ? removesLines ? "Drop this block from the result" : "Use this block in the result"
+                    : string.Empty,
+                IsLastPane = isLastPane,
+            };
+        }
+
+        return row with { Cells = cells };
     }
 
     private static DiffRow BuildRow(LineChange change, SourceLanguage syntax, int? blockId)

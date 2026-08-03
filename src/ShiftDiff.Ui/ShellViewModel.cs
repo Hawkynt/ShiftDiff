@@ -438,11 +438,40 @@ public sealed class ShellViewModel : ObservableObject
     /// </summary>
     public bool TakeSelectedBlock(int sourcePane)
     {
+        var run = SelectedRunInDocument();
+        return run is var (start, end) && TakeBlockRange(start, end, sourcePane);
+    }
+
+    /// <summary>
+    /// Transfers one identified change block, whichever row the cursor is on —
+    /// what the in-place arrow on the block does.
+    /// </summary>
+    public bool TakeBlock(int blockId, int sourcePane)
+    {
+        var range = RangeOfBlock(blockId);
+        return range is var (start, end) && TakeBlockRange(start, end, sourcePane);
+    }
+
+    private (int Start, int End)? RangeOfBlock(int blockId)
+    {
+        int? start = null;
+        var end = 0;
+        for (var i = 0; i < Document.Rows.Count; i++)
+        {
+            if (Document.Rows[i].BlockId != blockId) continue;
+
+            start ??= i;
+            end = i;
+        }
+
+        return start is { } value ? (value, end) : null;
+    }
+
+    private bool TakeBlockRange(int start, int end, int sourcePane)
+    {
         if (_merge is null) return false;
         if (sourcePane < 0 || sourcePane >= Document.PaneCount) return false;
-
-        var run = SelectedRunInDocument();
-        if (run is not var (start, end)) return false;
+        if (start < 0 || end >= Document.Rows.Count || end < start) return false;
 
         var sourceLines = new List<string>();
         int? targetStart = null;

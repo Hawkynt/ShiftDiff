@@ -29,8 +29,18 @@ diff state (added/removed inside an edited line) and the syntax class of the tok
 unchanged lines further than the context distance from a change fold into a single expandable
 row.
 
-A relocated block is drawn as one moved unit on both sides — never as a delete on the left and an
-add on the right — and a relationship thread connects its two ends across the panes.
+Every run of changed rows is one **change block**: each pane draws a coloured outline around it,
+and the gutter between two panes carries a connector bracketing the block on both sides —
+`… order.Total < 0 ]————[ order.Total <= 0 …`. An aligned block gives a level connector, a block
+that exists on one side only collapses its other bracket to a tick pointing at the position, and
+a relocated block gets a sloped line between the place it left and the place it arrived — a
+relocation is drawn as one moved unit on both sides, never as a delete on the left and an add on
+the right.
+
+Each block carries an arrow button at its edge, pointing at the pane the result is built from.
+Clicking it transfers that block into the result without selecting it first: `▶` on a left-hand
+pane, `◀` on a right-hand one. On the empty side of an insertion the arrow drops those lines from
+the result instead.
 
 ## Overview bar and navigation
 
@@ -56,8 +66,9 @@ The moved-block list beneath jumps to any block.
 
 The reconstructed result always mirrors the second pane — the target file of a two-way
 comparison, the local file of a three-way merge — so a resolution is always "use that version
-instead". `Take left` (or `Take base` and `Take remote` in a merge) replaces the selected change
-run, `Undo` reverts the last action, and `Save…` writes the result. Source files are never
+instead". The arrow on a block resolves that block in place; `Take left` (or `Take base` and
+`Take remote` in a merge) resolves the block under the cursor, `Undo` reverts the last action,
+and `Save…` writes the result. Source files are never
 modified, and an existing file is never overwritten without an explicit confirmation (AC-010).
 
 A four-way comparison validates a candidate target rather than producing one, so it offers no

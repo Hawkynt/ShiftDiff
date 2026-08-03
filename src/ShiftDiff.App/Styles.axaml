@@ -115,9 +115,86 @@
     <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
   </Style>
 
+  <!-- Every pane but the last reserves a gutter on its right for the linking
+       ribbons the RelationshipLayer draws.  -->
   <Style Selector="Border.cell">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0,0,0,0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
+    <Setter Property="Padding" Value="0,0,38,0" />
+  </Style>
+
+  <Style Selector="Border.cell.lastpane">
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <!-- Araxis-style block outline: one box around each run of changed rows.  -->
+  <Style Selector="Border.blockbox">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Margin" Value="0,0,2,0" />
+  </Style>
+
+  <Style Selector="Border.blockbox.single">
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="3" />
+  </Style>
+
+  <Style Selector="Border.blockbox.first">
+    <Setter Property="BorderThickness" Value="1,1,1,0" />
+    <Setter Property="CornerRadius" Value="3,3,0,0" />
+  </Style>
+
+  <Style Selector="Border.blockbox.mid">
+    <Setter Property="BorderThickness" Value="1,0,1,0" />
+  </Style>
+
+  <Style Selector="Border.blockbox.last">
+    <Setter Property="BorderThickness" Value="1,0,1,1" />
+    <Setter Property="CornerRadius" Value="0,0,3,3" />
+  </Style>
+
+  <Style Selector="Border.blockbox.added">
+    <Setter Property="BorderBrush" Value="{DynamicResource AddedAccentBrush}" />
+  </Style>
+
+  <Style Selector="Border.blockbox.removed">
+    <Setter Property="BorderBrush" Value="{DynamicResource RemovedAccentBrush}" />
+  </Style>
+
+  <Style Selector="Border.blockbox.edited">
+    <Setter Property="BorderBrush" Value="{DynamicResource EditedAccentBrush}" />
+  </Style>
+
+  <Style Selector="Border.blockbox.moved">
+    <Setter Property="BorderBrush" Value="{DynamicResource MovedAccentBrush}" />
+  </Style>
+
+  <Style Selector="Border.blockbox.conflict">
+    <Setter Property="BorderBrush" Value="{DynamicResource ConflictAccentBrush}" />
+  </Style>
+
+  <!-- The in-place transfer arrow that pushes a block into the result.  -->
+  <Style Selector="Button.transfer">
+    <Setter Property="Padding" Value="4,0" />
+    <Setter Property="Margin" Value="2,0,1,0" />
+    <Setter Property="MinWidth" Value="18" />
+    <Setter Property="MinHeight" Value="16" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+
+  <Style Selector="Button.transfer:pointerover">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
+  <Style Selector="Button.transfer:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
 
   <Style Selector="Border.cell.added">

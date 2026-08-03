@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace ShiftDiff.App.Tests;
 
@@ -161,6 +163,38 @@ public class ViewSettingsTests : IDisposable
         Assert.True(window.FindControl<StackPanel>("ResolvePanel")!.IsVisible);
         Assert.False(window.FindControl<Button>("TakeRemoteButton")!.IsVisible);
         Assert.Equal("◀ Take left", window.FindControl<Button>("TakeLeftButton")!.Content);
+    }
+
+    // The arrow drawn on a change block transfers exactly that block.
+    [AvaloniaFact]
+    public void TransferArrow_OnABlock_CopiesItIntoTheResult()
+    {
+        var window = Show(Write("a.txt", TwoLines("left")), Write("b.txt", TwoLines("right")));
+        PumpUntil(() => window.FindControl<ListBox>("DiffList")!.ItemCount > 0);
+
+        var arrow = window.GetVisualDescendants().OfType<Button>()
+            .FirstOrDefault(button => button.Classes.Contains("transfer") && button.IsVisible);
+        Assert.NotNull(arrow);
+
+        arrow!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump();
+
+        Assert.Contains("Result edited", window.FindControl<TextBlock>("MergeStateText")!.Text ?? string.Empty);
+    }
+
+    [AvaloniaFact]
+    public void BlockBoxes_AreDrawnAroundChangedRowsOnly()
+    {
+        var window = Show(Write("a.txt", TwoLines("left")), Write("b.txt", TwoLines("right")));
+        PumpUntil(() => window.FindControl<ListBox>("DiffList")!.ItemCount > 0);
+
+        var boxes = window.GetVisualDescendants().OfType<Border>()
+            .Where(border => border.Classes.Contains("blockbox"))
+            .ToArray();
+
+        Assert.NotEmpty(boxes);
+        Assert.Contains(boxes, border => border.BorderThickness.Top > 0 || border.BorderThickness.Bottom > 0);
+        Assert.Contains(boxes, border => border.BorderThickness == default);
     }
 
     private MainWindow Show(params string[] args)

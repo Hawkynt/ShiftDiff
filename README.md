@@ -29,10 +29,12 @@ Full spec (goals, use cases, UI, roadmap): [SPEC.md](SPEC.md).
 
 ## Desktop application
 
-A method was moved and its condition edited. Both ends of the move are drawn as
-one relocated block, the moved-block list names it with a confidence and a
-similarity score, and the overview bar on the right compresses the whole file
-into change stripes.
+A method was moved and its condition edited. Each change block is outlined in
+its own colour, the gutter between the panes brackets each block on both sides
+and joins them with a connector line, and an arrow on the block transfers it
+into the reconstructed result in one click. Both ends of the move are drawn as one
+relocated block, the moved-block list names it with a confidence and a
+similarity score, and the overview bar compresses the whole file into stripes.
 
 ### Dark theme
 
