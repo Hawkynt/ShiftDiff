@@ -244,6 +244,7 @@ public sealed partial class MainWindow : Window
         _rows.Clear();
         foreach (var row in _shell.VisibleRows) _rows.Add(row);
         _suppressSelection = false;
+        EmptyState.IsVisible = _rows.Count == 0;
         UpdateViewportIndicator();
         UpdateRelationshipLinks();
     }

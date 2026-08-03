@@ -103,8 +103,16 @@
     <Setter Property="Background" Value="Transparent" />
   </Style>
 
+  <!-- The cells paint their own backgrounds, so the selected row is marked with
+       rules above and below rather than a fill that would hide the change colour. -->
   <Style Selector="ListBox.diff ListBoxItem:selected /template/ ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="0,1,0,1" />
+  </Style>
+
+  <Style Selector="ListBox.diff ListBoxItem:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
   </Style>
 
   <Style Selector="Border.cell">
@@ -202,6 +210,11 @@
 
   <Style Selector="TextBlock.marker.conflict">
     <Setter Property="Foreground" Value="{DynamicResource ConflictAccentBrush}" />
+  </Style>
+
+  <Style Selector="Border.linegutter">
+    <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
   </Style>
 
   <Style Selector="TextBlock.linenumber">
