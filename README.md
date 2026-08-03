@@ -27,34 +27,73 @@ what happened to it on the way" instead of just "what lines differ."
 
 Full spec (goals, use cases, UI, roadmap): [SPEC.md](SPEC.md).
 
-## Desktop showcase
+## Desktop application
 
-The same three-folder comparison is captured from the real Avalonia application
-in CI. The upper workspace aligns moved files and folders; the lower workspace
-shows moved/edited blocks and the block-editable merge target.
+A method was moved and its condition edited. Both ends of the move are drawn as
+one relocated block, the moved-block list names it with a confidence and a
+similarity score, and the overview bar on the right compresses the whole file
+into change stripes.
 
 ### Dark theme
 
-[![ShiftDiff three-pane folder and source comparison in dark theme](docs/screenshots/workspace-dark.png)](docs/screenshots/workspace-dark.png)
+[![ShiftDiff comparing two C# files, one method moved and edited, dark theme](docs/screenshots/workspace-dark.png)](docs/screenshots/workspace-dark.png)
 
 ### Light theme
 
-[![ShiftDiff three-pane folder and source comparison in light theme](docs/screenshots/workspace-light.png)](docs/screenshots/workspace-light.png)
+[![ShiftDiff comparing two C# files, one method moved and edited, light theme](docs/screenshots/workspace-light.png)](docs/screenshots/workspace-light.png)
 
-The deterministic inputs live in [`docs/showcase`](docs/showcase), and
-[`scripts/capture-showcase.sh`](scripts/capture-showcase.sh) regenerates both
-screenshots through the UI Showcase workflow.
+Details of the workspace, navigation and merge model:
+[comparison workspace](docs/comparison-workspace.md). The deterministic showcase
+inputs live in [`docs/showcase`](docs/showcase), and
+[`scripts/capture-showcase.sh`](scripts/capture-showcase.sh) recaptures the real
+window through the UI Showcase workflow.
 
-## Example
+## Command line
 
-![shiftdiff comparing two files, one method reordered and edited](docs/example.png)
+The same analysis drives the CLI. The default output names the moved blocks and
+shows token-level edits inline, instead of rendering a move as delete + add:
 
-A method (`Validate`/`Describe`) was reordered and its condition edited. This
-is the CLI's current default output — a plain unified diff via
-`FileComparer`/`UnifiedDiffFormatter`. The move/edit-aware classification
-described below (`BlockClassifier`, `Confidence`) is implemented and tested in
-`ShiftDiff.Core`, but isn't wired into the CLI's output yet, so a moved method
-still renders as delete+add here rather than as an annotated move.
+```
+$ shiftdiff compare old.cs new.cs --mode aggressive
+--- old.cs
++++ new.cs
+# C# · 6 added · 5 removed · 1 edited · 1 moved block(s)
+M moved: old 17-20 -> new 7-10 (certain, 96 %)
+@@ -4,9 +4,15 @@
+     4    4
+     5    5 public class Sample
+     6    6 {
+M         7     // Describes the sample
+M         8     public string Describe()
+M         9     {
+M        10         return "sample";
++        11     }
++        12
+     7   13     public bool Validate(int value)
+     8   14     {
+~    9   15         if (value [-<-]{+<=+} 0)
+    10   16         {
+    11   17             return false;
+    12   18         }
+```
+
+```
+shiftdiff compare <old> <new>                       two files or two folders
+shiftdiff compare3 <base> <local> <remote>          three-way merge preview
+shiftdiff compare4 <base> <local> <remote> <target> validate a reconstruction
+shiftdiff apply-patch <source> <patch> --out <file> reconstruct a target
+shiftdiff export-patch <old> <new> --out <patch>    write a unified/SVN patch
+shiftdiff git status|diff|log [rev [rev]]           compare against Git
+shiftdiff svn status|diff|log [rev [rev]]           compare against SVN
+```
+
+Options: `--format semantic|unified|git|svn|json`, `--json`, `--mode
+strict|balanced|aggressive`, `--patch-mode exact|fuzzy|semantic`,
+`--ignore-case`, `--ignore-whitespace`, `--context <n>`, `--emoji`/`--no-emoji`,
+`--out <file>`, `--force`.
+
+Exit codes: `0` no differences, `1` differences, `2` conflicts, `3` invalid
+input, `4` internal error.
 
 ## How it works
 
@@ -98,42 +137,57 @@ copies, similarity index, `diff --git` paths) and SVN-style diff export:
 - **Export** the (possibly reconstructed) result back to a unified diff,
   a Git-compatible patch, or an SVN-compatible diff.
 
+## Version control
+
+`ShiftDiff.Vcs` puts Git and SVN behind one provider abstraction: repository
+detection, working-tree/working-copy status, changes between revisions, file
+content at a revision, and history. Every command runs through an injectable
+process runner, so the providers are tested without a repository on disk.
+Renames and copies Git reports are carried through as moves rather than as a
+delete/add pair.
+
 ## Status
 
 The diff/patch **engine** (`ShiftDiff.Core`) implements the pipeline above —
-line hashing, anchor detection, block building/scoring/classification, split
-merge detection, and unified/Git/SVN patch parsing + exact/fuzzy/semantic
-application + export.
+line hashing, anchor detection, block building/scoring/classification, split and
+merge detection, move refinement, folder comparison with move/copy/rename
+detection, multi-source workspace alignment, and unified/Git/SVN patch parsing +
+exact/fuzzy/semantic application + export.
 
-The **CLI** (`ShiftDiff.Cli`) can run a two-way compare (plain unified diff),
-a three-way base/local/remote merge (conflict markers on unresolved hunks),
-and apply a unified diff patch to a source file — but it calls the plain line
-differ directly, not the semantic engine, so it doesn't yet surface moved
-blocks or confidence levels (see the Example above).
+The **CLI** (`ShiftDiff.Cli`) runs the full spec command surface with the spec's
+exit codes, a semantic default rendering, JSON output for automation, folder
+comparison, and Git/SVN repository comparison.
 
-The **desktop UI** (`ShiftDiff.App`) now provides a two-to-four-pane file and folder
-workspace, drag-and-drop/open loading, move relationship lines, change navigation,
-interactive block insertion/replacement, undo, safe export, and direct
-light/system/dark theme controls. Source files are detected and tokenized using
-language profiles for C#, JavaScript/TypeScript, Java, C/C++, Python, Go, Rust,
-PHP, Perl, Ruby, Visual Basic, HTML, CSS, and SQL.
+The **presentation layer** (`ShiftDiff.Ui`) owns the document model, navigation,
+filtering, the inspector and the interactive merge target, with no UI-framework
+dependency, so it is unit-tested directly.
 
-**Not built yet:** direct Git/SVN repository integration and a fully editable
-character-level merge target. See SPEC.md §8.4/§12 for the planned CLI surface
-and §17 for MVP scope.
+The **desktop UI** (`ShiftDiff.App`) is an Avalonia shell over that layer:
+synchronized panes for two to four sources, intra-line token colouring, syntax
+highlighting, folded unchanged regions, an overview bar, a file-list sidebar,
+a change inspector, moved-block navigation, search and change-type filters,
+block-level merging with undo and guarded export, and light/dark/system themes
+with switchable emoji markers.
+
+**Not built yet:** staging and unstaging hunks, an SVN revision browser, a fully
+editable character-level merge target, and AST-assisted matching. See SPEC.md
+§17 for MVP scope and §18 for the planned versions.
 
 ## Layout
 
-- `src/ShiftDiff.Core` — diff engine (hashing, anchor detection, block
-  matching, patch parsing/application). No UI or VCS dependencies.
-- `src/ShiftDiff.Cli` — command-line entry point (two-way/three-way compare, patch apply).
-- `src/ShiftDiff.App` — Avalonia desktop UI for two-to-four-pane file/folder comparison and block merging.
-- `tests/ShiftDiff.Core.Tests` — xunit tests for the core engine.
-- `tests/ShiftDiff.Cli.Tests` — xunit tests for the CLI.
+- `src/ShiftDiff.Core` — diff engine (hashing, anchor detection, block matching,
+  folder and workspace comparison, patch parsing/application). No UI or VCS
+  dependencies.
+- `src/ShiftDiff.Vcs` — Git and SVN providers behind `IVcsProvider`.
+- `src/ShiftDiff.Ui` — presentation layer: document model, settings, navigation,
+  filtering, inspector, interactive merge. No UI framework dependency.
+- `src/ShiftDiff.Cli` — command-line entry point.
+- `src/ShiftDiff.App` — Avalonia desktop shell.
+- `tests/…` — xunit tests per project, including headless Avalonia tests for the
+  window.
 
 Language profiles live in `ShiftDiff.Core` and are independent of the Avalonia UI.
 See [source language support](docs/source-language-support.md) for the extension model.
-The VCS-integration project remains planned.
 
 ## Building
 
@@ -141,6 +195,7 @@ The VCS-integration project remains planned.
 dotnet build
 dotnet test
 dotnet run --project src/ShiftDiff.App -- path-a path-b [path-c] [path-d]
+dotnet run --project src/ShiftDiff.Cli -- compare old.cs new.cs
 ```
 
 ## Workflow

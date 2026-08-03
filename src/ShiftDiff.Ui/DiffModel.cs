@@ -159,3 +159,6 @@ public sealed record DiffSummary(
 
 /// <summary>One stripe of the overview bar / minimap, positioned in normalized 0..1 document space.</summary>
 public sealed record OverviewStripe(double Start, double End, ChangeType ChangeType, int RowIndex);
+
+/// <summary>A thread drawn between two panes, connecting the two ends of one relocated block.</summary>
+public sealed record PaneLink(int SourcePane, int TargetPane, int SourceRow, int TargetRow, ChangeType Kind);

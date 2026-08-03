@@ -21,6 +21,8 @@ public sealed class ShellViewModel : ObservableObject
     private string _sessionTitle = "ShiftDiff";
     private string? _oldTitle;
     private string? _newTitle;
+    private InteractiveMergeDocument? _merge;
+    private int _mergedLineCount;
     private bool _isBusy;
     private bool _showFileList;
     private int _selectedRow = -1;
@@ -50,6 +52,7 @@ public sealed class ShellViewModel : ObservableObject
             Raise(nameof(Summary));
             Raise(nameof(MovedBlocks));
             Raise(nameof(Overview));
+            Raise(nameof(Links));
             Raise(nameof(LanguageName));
             Raise(nameof(PaneTitles));
         }
@@ -68,6 +71,8 @@ public sealed class ShellViewModel : ObservableObject
     public IReadOnlyList<MovedBlockInfo> MovedBlocks => Document.MovedBlocks;
 
     public IReadOnlyList<OverviewStripe> Overview => Document.Overview;
+
+    public IReadOnlyList<PaneLink> Links => Document.Links;
 
     public IReadOnlyList<string> PaneTitles => Document.PaneTitles;
 
@@ -176,6 +181,10 @@ public sealed class ShellViewModel : ObservableObject
     public Task OpenFolderPairAsync(string basePath, string targetPath) =>
         OpenAsync(new FolderComparisonSource(basePath, targetPath));
 
+    /// <summary>Two to four folder trees aligned side by side (§7.3 four-way comparison).</summary>
+    public Task OpenWorkspaceAsync(IReadOnlyList<string> folders) =>
+        OpenAsync(new WorkspaceComparisonSource(folders.Take(4).ToArray()));
+
     public Task OpenRepositoryAsync(
         string path, string fromRevision = VcsRevisions.Head, string toRevision = VcsRevisions.WorkingTree)
     {
@@ -205,6 +214,10 @@ public sealed class ShellViewModel : ObservableObject
                 return OpenFolderPairAsync(paths[0], paths[1]);
             case 2:
                 return OpenFilePairAsync(paths[0], paths[1]);
+            // Three or four folders is a workspace comparison (§7.3), three or
+            // four files is a merge comparison.
+            case >= 3 when paths.Take(paths.Count).All(Directory.Exists):
+                return OpenWorkspaceAsync(paths);
             case 3:
                 return OpenThreeWayAsync(paths[0], paths[1], paths[2]);
             default:
@@ -327,6 +340,114 @@ public sealed class ShellViewModel : ObservableObject
         Settings.CollapseUnchanged = false;
     }
 
+    // --- interactive merge (FR-047) ---------------------------------------
+
+    /// <summary>Replaces the selected block in the target with the source side's version.</summary>
+    public bool TakeSelectedBlockFromLeft()
+    {
+        if (_merge is null) return false;
+
+        var run = SelectedRunInDocument();
+        if (run is not var (start, end)) return false;
+
+        var sourceLines = new List<string>();
+        int? targetStart = null;
+        var targetCount = 0;
+
+        for (var i = start; i <= end; i++)
+        {
+            var row = Document.Rows[i];
+            if (row.Cells.Count < 2) continue;
+
+            if (row.OldIndex is not null && row.Cells[0].State != CellState.Empty) sourceLines.Add(row.Cells[0].Text);
+            if (row.NewIndex is not { } newIndex) continue;
+
+            targetStart ??= newIndex;
+            targetCount++;
+        }
+
+        if (targetStart is null && sourceLines.Count == 0) return false;
+
+        var block = new MergeSourceBlock(
+            "left", OldTitle ?? "left", start, end, sourceLines, Document.Rows[start].DisplayChangeType);
+
+        var insertionPoint = targetStart ?? EstimateInsertionPoint(start);
+        if (targetCount > 0) _merge.Replace(block, insertionPoint, targetCount);
+        else _merge.Insert(block, insertionPoint);
+
+        MergedLineCount = _merge.Lines.Count;
+        StatusText = $"Took {sourceLines.Count} line(s) from the left side into the merged result";
+        Raise(nameof(CanUndoMerge));
+        return true;
+    }
+
+    public bool UndoMerge()
+    {
+        if (_merge?.Undo() != true) return false;
+
+        MergedLineCount = _merge.Lines.Count;
+        StatusText = "Reverted the last merge action";
+        Raise(nameof(CanUndoMerge));
+        return true;
+    }
+
+    public bool CanUndoMerge => _merge?.CanUndo == true;
+
+    public int MergedLineCount
+    {
+        get => _mergedLineCount;
+        private set => SetProperty(ref _mergedLineCount, value);
+    }
+
+    /// <summary>AC-010: never overwrites an existing file unless the caller insists.</summary>
+    public bool SaveMergedResult(string path, bool overwrite = false)
+    {
+        if (_merge is null) return false;
+        if (File.Exists(path) && !overwrite)
+        {
+            StatusText = $"{Path.GetFileName(path)} already exists — confirm the overwrite first";
+            return false;
+        }
+
+        File.WriteAllLines(path, _merge.Lines);
+        StatusText = $"Wrote {_merge.Lines.Count} line(s) to {path}";
+        return true;
+    }
+
+    public IReadOnlyList<string> MergedLines => _merge?.Lines ?? [];
+
+    private void StartMergeDocument(ComparisonInput input)
+    {
+        _merge = new InteractiveMergeDocument(TextFileLoader.Load(input.NewContent).Lines);
+        MergedLineCount = _merge.Lines.Count;
+        Raise(nameof(CanUndoMerge));
+    }
+
+    // The run of consecutive changed rows the cursor sits in.
+    private (int Start, int End)? SelectedRunInDocument()
+    {
+        var index = RowIndexInDocument(SelectedRow);
+        if (index < 0 || index >= Document.Rows.Count || !Document.Rows[index].IsChanged) return null;
+
+        var start = index;
+        while (start > 0 && Document.Rows[start - 1].IsChanged) start--;
+
+        var end = index;
+        while (end + 1 < Document.Rows.Count && Document.Rows[end + 1].IsChanged) end++;
+
+        return (start, end);
+    }
+
+    private int EstimateInsertionPoint(int rowIndex)
+    {
+        for (var i = rowIndex; i >= 0; i--)
+        {
+            if (Document.Rows[i].NewIndex is { } index) return index + 1;
+        }
+
+        return 0;
+    }
+
     // --- internals --------------------------------------------------------
 
     private async Task CompareSelectedFileAsync()
@@ -336,6 +457,7 @@ public sealed class ShellViewModel : ObservableObject
         var input = _source.Load(entry);
         OldTitle = input.OldTitle;
         NewTitle = input.NewTitle;
+        StartMergeDocument(input);
 
         await RunAnalysisAsync(token =>
         {

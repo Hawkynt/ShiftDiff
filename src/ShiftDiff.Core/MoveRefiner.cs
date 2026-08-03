@@ -18,11 +18,16 @@ public static class MoveRefiner
     // such files are boilerplate-heavy and the raw list is already meaningless.
     private const int MaxBlocksForOrderAnalysis = 2000;
 
+    // Lines that are never anchors (braces, blanks, boilerplate) split one
+    // relocated region into several matched fragments. Fragments that share a
+    // displacement and sit within this many lines of each other moved together.
+    private const int DefaultMaxGap = 8;
+
     public static BlockMatch[] Refine(IReadOnlyList<BlockMatch> blocks) =>
         KeepReorderings(Coalesce(blocks));
 
     /// <summary>Merges neighbouring blocks that share one old→new displacement.</summary>
-    public static BlockMatch[] Coalesce(IReadOnlyList<BlockMatch> blocks)
+    public static BlockMatch[] Coalesce(IReadOnlyList<BlockMatch> blocks, int maxGap = DefaultMaxGap)
     {
         if (blocks.Count <= 1) return [.. blocks];
 
@@ -33,7 +38,7 @@ public static class MoveRefiner
         foreach (var next in ordered.Skip(1))
         {
             var sameDisplacement = next.NewStart - next.OldStart == current.NewStart - current.OldStart;
-            var adjacent = next.OldStart <= current.OldEnd + 2 && next.OldStart >= current.OldStart;
+            var adjacent = next.OldStart <= current.OldEnd + 1 + maxGap && next.OldStart >= current.OldStart;
             var compatible = next.MatchType == current.MatchType;
 
             if (sameDisplacement && adjacent && compatible)

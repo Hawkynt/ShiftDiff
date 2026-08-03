@@ -114,6 +114,109 @@ public sealed class FolderComparisonSource : IComparisonSource
     };
 }
 
+// FR-042/§7.3: two to four folder trees aligned into one list, with the moves
+// between them named. Backed by ComparisonWorkspace so the alignment and the
+// relationship inference live in the engine, not in the UI.
+public sealed class WorkspaceComparisonSource : IComparisonSource
+{
+    private readonly WorkspaceComparison _comparison;
+    private readonly IReadOnlyList<string> _roots;
+
+    public WorkspaceComparisonSource(IReadOnlyList<string> folders)
+    {
+        ArgumentNullException.ThrowIfNull(folders);
+        if (folders.Count is < 2 or > 4) throw new ArgumentOutOfRangeException(nameof(folders), "A workspace compares two to four folders.");
+
+        _roots = folders;
+        var sources = folders
+            .Select((folder, index) => new WorkspaceSource(
+                index.ToString(), Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar)), Read(folder)))
+            .ToArray();
+
+        _comparison = ComparisonWorkspace.Compare(sources);
+        Title = string.Join(" ↔ ", sources.Select(source => source.Label));
+
+        Entries =
+        [
+            .. _comparison.Rows
+                .Where(row => row.Cells.Any(cell => cell is not null && cell.ChangeType != FolderChangeType.Unchanged)
+                              || row.Cells.Any(cell => cell is null))
+                .Select(row => new FileListEntry(row.LogicalPath, ChangeTypeOf(row), Describe(row), row)),
+        ];
+    }
+
+    public string Title { get; }
+
+    public IReadOnlyList<FileListEntry> Entries { get; }
+
+    public IReadOnlyList<WorkspaceRelationship> Relationships => _comparison.Relationships;
+
+    public ComparisonInput Load(FileListEntry entry)
+    {
+        var row = (WorkspaceRow)entry.Tag!;
+        var left = row.Cells[0];
+        var right = row.Cells.Skip(1).LastOrDefault(cell => cell is not null) ?? row.Cells[^1];
+
+        return new ComparisonInput(
+            ReadCell(left, 0), ReadCell(right, IndexOf(row, right)),
+            PathOf(left, 0), PathOf(right, IndexOf(row, right)));
+    }
+
+    private static int IndexOf(WorkspaceRow row, WorkspaceCell? cell) =>
+        cell is null ? row.Cells.Count - 1 : cell.SourceIndex;
+
+    private byte[] ReadCell(WorkspaceCell? cell, int sourceIndex)
+    {
+        if (cell is null) return [];
+
+        var path = Path.Combine(_roots[sourceIndex], cell.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(path) ? File.ReadAllBytes(path) : [];
+    }
+
+    private string PathOf(WorkspaceCell? cell, int sourceIndex) =>
+        cell is null ? "(absent)" : Path.Combine(_roots[sourceIndex], cell.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+
+    private static ChangeType ChangeTypeOf(WorkspaceRow row)
+    {
+        var target = row.Cells.Skip(1).LastOrDefault(cell => cell is not null);
+        if (target is null) return ChangeType.Removed;
+        if (row.Cells[0] is null) return ChangeType.Added;
+
+        return target.ChangeType switch
+        {
+            FolderChangeType.Moved => ChangeType.Moved,
+            FolderChangeType.MovedEdited => ChangeType.MovedEdited,
+            FolderChangeType.Added => ChangeType.Added,
+            FolderChangeType.Removed => ChangeType.Removed,
+            FolderChangeType.Copied => ChangeType.Split,
+            FolderChangeType.Changed => ChangeType.Edited,
+            _ => ChangeType.Unchanged,
+        };
+    }
+
+    private static string Describe(WorkspaceRow row)
+    {
+        var paths = row.Cells
+            .Where(cell => cell is not null)
+            .Select(cell => cell!.RelativePath)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        return paths.Length > 1 ? string.Join(" → ", paths) : $"{row.Cells.Count(cell => cell is null)} side(s) missing";
+    }
+
+    private static Dictionary<string, byte[]> Read(string root)
+    {
+        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            files[Path.GetRelativePath(root, path).Replace('\\', '/')] = File.ReadAllBytes(path);
+        }
+
+        return files;
+    }
+}
+
 // AC-006/AC-007: a repository's changed files, opened straight into the viewer.
 public sealed class VcsComparisonSource : IComparisonSource
 {

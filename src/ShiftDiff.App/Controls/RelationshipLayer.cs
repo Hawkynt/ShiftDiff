@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace ShiftDiff.App;
+namespace ShiftDiff.App.Controls;
 
 public sealed record VisualRelationship(
     int SourcePane,
@@ -11,10 +11,33 @@ public sealed record VisualRelationship(
     double TargetPosition,
     string Kind);
 
+// Araxis-style linking: threads drawn between the panes so a relocated block's
+// two ends read as one thing. Positions are viewport-relative, so the caller
+// recomputes them as the panes scroll.
 public sealed class RelationshipLayer : Control
 {
-    public IReadOnlyList<VisualRelationship> Links { get; set; } = [];
-    public int PaneCount { get; set; } = 2;
+    public static readonly StyledProperty<int> PaneCountProperty =
+        AvaloniaProperty.Register<RelationshipLayer, int>(nameof(PaneCount), 2);
+
+    private IReadOnlyList<VisualRelationship> _links = [];
+
+    static RelationshipLayer() => AffectsRender<RelationshipLayer>(PaneCountProperty);
+
+    public IReadOnlyList<VisualRelationship> Links
+    {
+        get => _links;
+        set
+        {
+            _links = value;
+            InvalidateVisual();
+        }
+    }
+
+    public int PaneCount
+    {
+        get => GetValue(PaneCountProperty);
+        set => SetValue(PaneCountProperty, value);
+    }
 
     public override void Render(DrawingContext context)
     {

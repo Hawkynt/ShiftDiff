@@ -21,6 +21,12 @@ public sealed class DiffDocument
         MovedBlocks = movedBlocks;
         Language = language;
         Overview = OverviewBuilder.Build(rows);
+        Links =
+        [
+            .. movedBlocks
+                .Where(block => block.OldRowIndex >= 0 && block.NewRowIndex >= 0)
+                .Select(block => new PaneLink(0, 1, block.OldRowIndex, block.NewRowIndex, block.MatchType)),
+        ];
         ChangeRowIndices = FirstRowsOfEachRun(rows, row => row.IsChanged);
         ConflictRowIndices = FirstRowsOfEachRun(rows, row => row.IsConflict);
         MovedRowIndices = FirstRowsOfEachRun(rows, row => row.IsMoved);
@@ -37,6 +43,9 @@ public sealed class DiffDocument
     public SourceLanguage Language { get; }
 
     public IReadOnlyList<OverviewStripe> Overview { get; }
+
+    /// <summary>Connector threads between panes for every relocated block (Araxis-style linking).</summary>
+    public IReadOnlyList<PaneLink> Links { get; }
 
     /// <summary>Row index of the first line of each contiguous run of changes (FR-045 next/previous change).</summary>
     public IReadOnlyList<int> ChangeRowIndices { get; }

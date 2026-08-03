@@ -110,9 +110,9 @@ public static class SemanticTextFormatter
             yield break;
         }
 
-        var type = change.ChangeType == ChangeType.Unchanged && IsInMovedBlock(change, movedBlocks)
-            ? ChangeType.Moved
-            : change.ChangeType;
+        // Both ends of a relocated block read as "moved" — showing them as a
+        // plain delete/add pair is exactly what this tool exists to avoid.
+        var type = IsInMovedBlock(change, movedBlocks) ? ChangeType.Moved : change.ChangeType;
 
         yield return $"{ChangeMarker.For(type, useEmoji)} {oldNumber} {newNumber} {change.NewLine ?? change.OldLine}";
     }

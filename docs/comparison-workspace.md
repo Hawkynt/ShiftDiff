@@ -1,42 +1,59 @@
 # Comparison workspace and interactive merge
 
-The desktop workspace compares two, three, or four file or folder sources in parallel. It is
-inspired by mature merge tools without copying their ribbon density or making every operation
-look like it launches a small satellite.
+The desktop application is a thin shell over `ShiftDiff.Ui`: the shell view model owns the
+session, the document model and the navigation state, and the Avalonia window only translates
+gestures into calls and state into controls. Everything described here is unit-tested without a
+display.
 
-## Folder view
+## Sessions
 
-The upper pane aligns entries against the first source and classifies added, removed, changed,
-moved, and moved-plus-edited files. When every file in a directory moves to the same directory,
-the workspace also emits a folder-move relationship. A transparent relationship layer draws
-the file and folder connections across panes.
+A session is opened by dropping paths on the window, by the toolbar buttons, or from the command
+line:
 
-Each pane can select a different file. This is intentional: a merge target may need a helper
-method or configuration block from a file that does not correspond to the selected file in the
-other panes.
+| Dropped               | Session                                                        |
+| --------------------- | -------------------------------------------------------------- |
+| two files             | side-by-side comparison                                        |
+| three files           | base/local/remote three-pane merge preview                     |
+| four files            | base/local/remote plus the reconstructed target (AC-003)       |
+| two folders           | folder comparison with move, copy and rename detection         |
+| three or four folders | workspace comparison (`ComparisonWorkspace`) across all sources |
+| one folder            | Git or SVN working copy, if one is detected there              |
 
-## File and block view
+Folder and repository sessions fill the file-list sidebar; picking an entry compares that file.
 
-The lower source panes show the independently selected files. ShiftDiff compares the first
-available pane with every pane to its right, highlights changed ranges, and draws relationships
-between moved blocks. Selecting a line selects the semantic block containing it; a single line
-is used as a safe fallback when it belongs to no detected block.
+## Panes
+
+Rows are aligned across every pane, so scrolling is synchronized by construction. Each row shows
+its change marker, per-pane line numbers, and the line itself split into runs that carry both the
+diff state (added/removed inside an edited line) and the syntax class of the token. Runs of
+unchanged lines further than the context distance from a change fold into a single expandable
+row.
+
+A relocated block is drawn as one moved unit on both sides — never as a delete on the left and an
+add on the right — and a relationship thread connects its two ends across the panes.
+
+## Overview bar and navigation
+
+The overview bar compresses the whole document into stripes coloured by change type, with a
+viewport indicator; clicking or dragging jumps there. The toolbar and keyboard cover next and
+previous change (F7/F8), next conflict (Shift+F8), next moved block (Ctrl+F8) and jump to the
+paired end of a moved block (Ctrl+P).
+
+## Inspector
+
+Selecting a line explains it: change type, source and target line, and — for a block match — its
+range, size, similarity score, confidence and the reason the engine accepted the match (FR-046).
+The moved-block list beneath jumps to any block.
 
 ## Interactive merge target
 
-The merge target starts as a copy of the first available source file. Source blocks can be:
+The result starts as a copy of the right-hand file. `Take left` replaces the selected change run
+with the left side's version, `Undo` reverts the last action, and `Save…` writes the
+reconstructed file. Source files are never modified, and an existing file is never overwritten
+without an explicit confirmation (AC-010).
 
-- inserted after the selected target line;
-- used to replace the corresponding target range;
-- taken from any pane and any file selected in that pane;
-- undone without modifying source files.
+## Themes and markers
 
-Export writes a new reconstructed target through the platform save picker. It never overwrites a
-source merely because someone clicked an arrow with excessive confidence.
-
-## Themes
-
-Light, system, and dark themes are directly available in the main toolbar. Layout surfaces use
-theme resources; semantic colors use translucent overlays so their meaning remains consistent in
-both light and dark modes.
-
+Light, dark and system themes are declared as theme dictionaries, so every surface and every
+semantic colour switches together. Change markers are available as emoji or as plain text and can
+be switched at any time; no marker relies on colour or emoji alone (FR-043/FR-044).

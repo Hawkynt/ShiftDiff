@@ -118,8 +118,13 @@ public sealed partial class MainWindow : Window
         _diffScroll = DiffList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (_diffScroll is null) return;
 
-        _diffScroll.ScrollChanged += (_, _) => UpdateViewportIndicator();
+        _diffScroll.ScrollChanged += (_, _) =>
+        {
+            UpdateViewportIndicator();
+            UpdateRelationshipLinks();
+        };
         UpdateViewportIndicator();
+        UpdateRelationshipLinks();
     }
 
     private void UpdateViewportIndicator()
@@ -131,6 +136,64 @@ public sealed partial class MainWindow : Window
 
         Overview.ViewportStart = _diffScroll.Offset.Y / extent;
         Overview.ViewportEnd = (_diffScroll.Offset.Y + _diffScroll.Viewport.Height) / extent;
+    }
+
+    // Araxis-style pane linking: the moved-block threads are drawn against the
+    // visible viewport, so they follow the panes as they scroll.
+    private void UpdateRelationshipLinks()
+    {
+        if (_rows.Count == 0 || _shell.Links.Count == 0)
+        {
+            Relationships.Links = [];
+            return;
+        }
+
+        Relationships.PaneCount = Math.Max(2, _shell.PaneTitles.Count);
+
+        var rowHeight = _diffScroll is { Extent.Height: > 0 } ? _diffScroll.Extent.Height / _rows.Count : 0;
+        var viewport = _diffScroll?.Viewport.Height ?? Bounds.Height;
+        var offset = _diffScroll?.Offset.Y ?? 0;
+        if (rowHeight <= 0 || viewport <= 0)
+        {
+            Relationships.Links = [];
+            return;
+        }
+
+        var links = new List<VisualRelationship>();
+        foreach (var link in _shell.Links)
+        {
+            var source = PositionOf(link.SourceRow);
+            var target = PositionOf(link.TargetRow);
+            if (source is null || target is null) continue;
+
+            links.Add(new VisualRelationship(
+                link.SourcePane, link.TargetPane, source.Value, target.Value,
+                link.Kind == ChangeType.MovedEdited ? "edited" : "block"));
+        }
+
+        Relationships.Links = links;
+
+        double? PositionOf(int documentRow)
+        {
+            var visibleRow = VisibleIndexOfDocumentRow(documentRow);
+            if (visibleRow < 0) return null;
+
+            var position = (visibleRow * rowHeight + rowHeight / 2 - offset) / viewport;
+            return position is >= -0.05 and <= 1.05 ? position : null;
+        }
+    }
+
+    private int VisibleIndexOfDocumentRow(int documentRow)
+    {
+        if (documentRow < 0 || documentRow >= _shell.Document.Rows.Count) return -1;
+
+        var row = _shell.Document.Rows[documentRow];
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            if (ReferenceEquals(_rows[i], row)) return i;
+        }
+
+        return -1;
     }
 
     // --- view-model plumbing ----------------------------------------------
@@ -169,6 +232,9 @@ public sealed partial class MainWindow : Window
             case nameof(ShellViewModel.ChangePositionText):
                 ChangePositionText.Text = _shell.ChangePositionText;
                 break;
+            case nameof(ShellViewModel.MergedLineCount):
+                UpdateMergeState();
+                break;
         }
     }
 
@@ -179,6 +245,7 @@ public sealed partial class MainWindow : Window
         foreach (var row in _shell.VisibleRows) _rows.Add(row);
         _suppressSelection = false;
         UpdateViewportIndicator();
+        UpdateRelationshipLinks();
     }
 
     private void ReplaceMovedBlocks()
@@ -301,6 +368,40 @@ public sealed partial class MainWindow : Window
     private void OnJumpToPair(object? sender, RoutedEventArgs e) => _shell.GoToPairedBlock();
 
     private void OnCancel(object? sender, RoutedEventArgs e) => _shell.CancelAnalysis();
+
+    // --- interactive merge (FR-047) ---------------------------------------
+
+    private void OnTakeLeftBlock(object? sender, RoutedEventArgs e)
+    {
+        if (!_shell.TakeSelectedBlockFromLeft()) StatusText.Text = "Select a changed line first.";
+        UpdateMergeState();
+    }
+
+    private void OnUndoMerge(object? sender, RoutedEventArgs e)
+    {
+        _shell.UndoMerge();
+        UpdateMergeState();
+    }
+
+    private async void OnSaveMerged(object? sender, RoutedEventArgs e)
+    {
+        var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save the reconstructed result",
+            SuggestedFileName = Path.GetFileName(_shell.NewTitle ?? "resolved.txt"),
+        });
+
+        if (target is null) return;
+
+        // The picker already asked the user about replacing an existing file.
+        _shell.SaveMergedResult(target.Path.LocalPath, overwrite: true);
+        UpdateMergeState();
+    }
+
+    private void UpdateMergeState() =>
+        MergeStateText.Text = _shell.CanUndoMerge
+            ? $"Result edited · {_shell.MergedLineCount} lines"
+            : "Result matches the right file";
 
     // --- options ----------------------------------------------------------
 

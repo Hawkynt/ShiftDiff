@@ -147,7 +147,8 @@
           </Grid>
         </Border>
 
-        <ListBox Grid.Row="1" x:Name="DiffList" Classes="diff" SelectionChanged="OnRowSelected"
+        <Panel Grid.Row="1">
+        <ListBox x:Name="DiffList" Classes="diff" SelectionChanged="OnRowSelected"
                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
           <ListBox.ItemTemplate>
             <DataTemplate>
@@ -234,6 +235,9 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+
+          <controls:RelationshipLayer x:Name="Relationships" Margin="34,0,0,0" IsHitTestVisible="False" />
+        </Panel>
       </Grid>
 
       <!-- Overview bar -->
@@ -243,7 +247,7 @@
       <!-- Inspector -->
       <Border Grid.Column="3" x:Name="InspectorPanel" Width="300" Background="{DynamicResource PanelBrush}"
               BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1,0,0,0">
-        <Grid RowDefinitions="Auto,Auto,Auto,*">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
           <StackPanel Margin="14,12,14,8" Spacing="4">
             <TextBlock Text="ANALYSIS" Classes="caption" />
             <TextBlock x:Name="LanguageText" Text="—" />
@@ -268,9 +272,21 @@
             </StackPanel>
           </Border>
 
-          <TextBlock Grid.Row="2" Text="MOVED BLOCKS" Classes="caption" Margin="14,2,14,6" />
+          <StackPanel Grid.Row="2" Margin="12,0,12,8" Spacing="6">
+            <TextBlock Text="RESOLVE" Classes="caption" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button Content="◀ Take left" Click="OnTakeLeftBlock"
+                      ToolTip.Tip="Replace the selected block in the result with the left side's version" />
+              <Button Content="↶ Undo" Click="OnUndoMerge" ToolTip.Tip="Undo the last resolve action" />
+              <Button Content="Save…" Classes="accent" Click="OnSaveMerged"
+                      ToolTip.Tip="Write the reconstructed result to a file" />
+            </StackPanel>
+            <TextBlock x:Name="MergeStateText" Classes="muted" FontSize="11" Text="Result matches the right file" />
+          </StackPanel>
 
-          <ListBox Grid.Row="3" x:Name="MovedBlocksList" Background="Transparent" BorderThickness="0"
+          <TextBlock Grid.Row="3" Text="MOVED BLOCKS" Classes="caption" Margin="14,2,14,6" />
+
+          <ListBox Grid.Row="4" x:Name="MovedBlocksList" Background="Transparent" BorderThickness="0"
                    Margin="6,0,6,6" SelectionChanged="OnMovedBlockSelected">
             <ListBox.ItemTemplate>
               <DataTemplate>

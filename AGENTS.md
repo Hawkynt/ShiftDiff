@@ -38,7 +38,13 @@ change only, no tooling/authorship attribution.
 ## Layout
 
 - `src/ShiftDiff.Core` — diff engine, no UI/VCS dependencies.
+- `src/ShiftDiff.Vcs` — Git/SVN providers behind `IVcsProvider`; all process
+  calls go through `IProcessRunner` so they stay testable.
+- `src/ShiftDiff.Ui` — presentation layer (document model, navigation, merge).
+  No UI framework dependency: put logic here, not in the window.
 - `src/ShiftDiff.Cli` — command-line entry point.
-- `tests/ShiftDiff.Core.Tests` — xunit.
+- `src/ShiftDiff.App` — Avalonia shell; keep it thin.
+- `tests/<project>.Tests` — xunit per project. `ShiftDiff.App.Tests` runs
+  headless Avalonia (xunit v3) and can render frames to `SHIFTDIFF_SHOTS`.
 
 Run `dotnet test` before every commit.
