@@ -36,7 +36,7 @@ jobs:
       # fontconfig on the Linux runner.
       - name: Install rendering dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes libfontconfig1
+        run: sudo apt-get update && sudo apt-get install --yes libfontconfig1 fonts-dejavu-core
 
       - name: Restore
         run: dotnet restore ShiftDiff.slnx
