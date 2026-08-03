@@ -30,15 +30,25 @@ public sealed class GitProvider(IProcessRunner? processRunner = null, string exe
     {
         if (string.IsNullOrEmpty(fromRevision) && string.IsNullOrEmpty(toRevision)) return GetWorkingChanges(root);
 
-        if (string.IsNullOrEmpty(toRevision))
-        {
-            // Working tree against a revision.
-            return GitOutputParser.ParseNameStatus(Run(root, "diff", "--name-status", "-M", "-C", fromRevision));
-        }
+        var arguments = string.IsNullOrEmpty(toRevision)
+            ? new[] { "diff", "--name-status", "-M", "-C", fromRevision }
+            : ["diff", "--name-status", "-M", "-C", fromRevision, toRevision];
 
-        return GitOutputParser.ParseNameStatus(
-            Run(root, "diff", "--name-status", "-M", "-C", fromRevision, toRevision));
+        var result = _processRunner.Run(Executable, arguments, root);
+        if (result.Succeeded) return GitOutputParser.ParseNameStatus(result.StandardOutput);
+
+        // A repository without commits has no HEAD to diff against; its working
+        // tree is the whole change.
+        if (string.IsNullOrEmpty(toRevision) && !RevisionExists(root, fromRevision)) return GetWorkingChanges(root);
+
+        throw new VcsCommandException(
+            $"git {string.Join(' ', arguments)} failed ({result.ExitCode}): {FirstLines(result.StandardError)}");
     }
+
+    /// <summary>True when git can resolve the revision in that repository.</summary>
+    public bool RevisionExists(string root, string revision) =>
+        !string.IsNullOrEmpty(revision)
+        && _processRunner.Run(Executable, ["rev-parse", "--verify", "--quiet", $"{revision}^{{commit}}"], root).Succeeded;
 
     public string GetFileContent(string root, string relativePath, string revision)
     {

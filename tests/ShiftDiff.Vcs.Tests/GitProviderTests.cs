@@ -4,6 +4,8 @@ namespace ShiftDiff.Vcs.Tests;
 
 public class GitProviderTests : IDisposable
 {
+    private static readonly string Newline = new(['\n']);
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "shiftdiff-vcs", Guid.NewGuid().ToString("N"));
 
     public GitProviderTests() => Directory.CreateDirectory(_root);
@@ -102,6 +104,45 @@ public class GitProviderTests : IDisposable
 
         Assert.Contains("HEAD", runner.LastCommandLine);
         Assert.DoesNotContain("HEAD HEAD", runner.LastCommandLine);
+    }
+
+    // A freshly initialised repository has no HEAD: its working tree is the diff.
+    [Fact]
+    public void GetChanges_AgainstAHeadThatDoesNotExistYet_FallsBackToTheWorkingTree()
+    {
+        var runner = new FakeProcessRunner()
+            .RespondWithFailure("rev-parse", string.Empty)
+            .RespondWithFailure("diff", "fatal: ambiguous argument 'HEAD'", 128)
+            .Respond("status", "?? new.txt" + Newline);
+
+        var change = Assert.Single(new GitProvider(runner).GetChanges(_root, "HEAD", ""));
+
+        Assert.Equal(VcsChangeKind.Untracked, change.Kind);
+    }
+
+    [Fact]
+    public void GetChanges_AgainstARevisionThatExists_ReportsTheFailureInsteadOfHidingIt()
+    {
+        var runner = new FakeProcessRunner()
+            .Respond("rev-parse", "abc123" + Newline)
+            .RespondWithFailure("diff", "fatal: bad object", 128);
+
+        Assert.Throws<VcsCommandException>(() => new GitProvider(runner).GetChanges(_root, "v1.0", ""));
+    }
+
+    [Fact]
+    public void RevisionExists_AsksGitToVerifyTheCommit()
+    {
+        var runner = new FakeProcessRunner().Respond("rev-parse", "abc123" + Newline);
+
+        Assert.True(new GitProvider(runner).RevisionExists(_root, "HEAD"));
+        Assert.Contains("--verify", runner.LastCommandLine);
+    }
+
+    [Fact]
+    public void RevisionExists_ForAnEmptyRevision_IsFalse()
+    {
+        Assert.False(new GitProvider(new FakeProcessRunner()).RevisionExists(_root, string.Empty));
     }
 
     [Fact]

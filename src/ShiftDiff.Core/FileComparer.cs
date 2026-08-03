@@ -41,7 +41,12 @@ public static class FileComparer
         var oldFile = TextFileLoader.Load(oldContent);
         var newFile = TextFileLoader.Load(newContent);
 
-        var changes = LineDiffer.Diff(oldFile.Lines, newFile.Lines, ignoreCase, whitespaceMode)
+        // An empty file loads as a single empty line; comparing that against a
+        // real file would report one edit instead of a file full of added lines.
+        var oldLines = Lines(oldFile);
+        var newLines = Lines(newFile);
+
+        var changes = LineDiffer.Diff(oldLines, newLines, ignoreCase, whitespaceMode)
             .Select(change => change.ChangeType == ChangeType.Edited
                 ? change with
                 {
@@ -52,12 +57,15 @@ public static class FileComparer
                 : change)
             .ToArray();
 
-        var candidates = BlockBuilder.Build(oldFile.Lines, newFile.Lines);
-        var blockMatches = BlockClassifier.Classify(candidates, oldFile.Lines, newFile.Lines, mode);
+        var candidates = BlockBuilder.Build(oldLines, newLines);
+        var blockMatches = BlockClassifier.Classify(candidates, oldLines, newLines, mode);
         var movedBlocks = SplitMergeDetector.Detect(blockMatches);
 
         return new FileComparisonResult(changes, movedBlocks);
     }
+
+    private static string[] Lines(TextFileContent file) =>
+        file.Lines is [] or [""] ? [] : file.Lines;
 
     private static string DecodeForDetection(byte[] content)
     {

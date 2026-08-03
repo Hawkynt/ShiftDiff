@@ -101,4 +101,31 @@ public class FileComparerTests
         Assert.All(result.Changes, change => Assert.Equal(ChangeType.Unchanged, change.ChangeType));
         Assert.Empty(result.MovedBlocks);
     }
+
+    private static byte[] TwoLineFile => Encoding.UTF8.GetBytes(string.Join('\n', ["one", "two", string.Empty]));
+
+    [Fact]
+    public void Compare_EmptyOldFile_ReportsEveryNewLineAsAdded()
+    {
+        var result = FileComparer.Compare([], TwoLineFile);
+
+        Assert.Equal(2, result.Changes.Count(change => change.ChangeType == ChangeType.Added));
+        Assert.DoesNotContain(result.Changes, change => change.ChangeType == ChangeType.Edited);
+    }
+
+    [Fact]
+    public void Compare_EmptyNewFile_ReportsEveryOldLineAsRemoved()
+    {
+        var result = FileComparer.Compare(TwoLineFile, []);
+
+        Assert.Equal(2, result.Changes.Count(change => change.ChangeType == ChangeType.Removed));
+    }
+
+    [Fact]
+    public void Compare_TwoEmptyFiles_ReportsNoChanges()
+    {
+        var result = FileComparer.Compare([], []);
+
+        Assert.DoesNotContain(result.Changes, change => change.ChangeType != ChangeType.Unchanged);
+    }
 }
