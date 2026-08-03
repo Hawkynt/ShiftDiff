@@ -125,6 +125,44 @@ public class ViewSettingsTests : IDisposable
         Assert.Equal(firstBefore, headers.Items.Cast<string>().First());
     }
 
+    [AvaloniaFact]
+    public void ResolvePanel_InAThreeWayMerge_OffersBaseAndRemote()
+    {
+        var window = Show(
+            Write("base.txt", TwoLines("two")),
+            Write("local.txt", TwoLines("LOCAL")),
+            Write("remote.txt", TwoLines("remote")));
+        PumpUntil(() => window.FindControl<ItemsControl>("PaneHeaders")!.ItemCount == 3);
+
+        Assert.True(window.FindControl<StackPanel>("ResolvePanel")!.IsVisible);
+        Assert.True(window.FindControl<Button>("TakeRemoteButton")!.IsVisible);
+        Assert.Equal("◀ Take base", window.FindControl<Button>("TakeLeftButton")!.Content);
+    }
+
+    [AvaloniaFact]
+    public void ResolvePanel_InAFourWayComparison_IsHidden()
+    {
+        var window = Show(
+            Write("base.txt", TwoLines("two")),
+            Write("local.txt", TwoLines("LOCAL")),
+            Write("remote.txt", TwoLines("remote")),
+            Write("target.txt", TwoLines("LOCAL")));
+        PumpUntil(() => window.FindControl<ItemsControl>("PaneHeaders")!.ItemCount == 4);
+
+        Assert.False(window.FindControl<StackPanel>("ResolvePanel")!.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void ResolvePanel_InATwoWayComparison_OffersOnlyTheLeftSide()
+    {
+        var window = Show(Write("a.txt", TwoLines("one")), Write("b.txt", TwoLines("two")));
+        PumpUntil(() => window.FindControl<ListBox>("DiffList")!.ItemCount > 0);
+
+        Assert.True(window.FindControl<StackPanel>("ResolvePanel")!.IsVisible);
+        Assert.False(window.FindControl<Button>("TakeRemoteButton")!.IsVisible);
+        Assert.Equal("◀ Take left", window.FindControl<Button>("TakeLeftButton")!.Content);
+    }
+
     private MainWindow Show(params string[] args)
     {
         var window = new MainWindow(args);
@@ -152,6 +190,8 @@ public class ViewSettingsTests : IDisposable
 
         Pump();
     }
+
+    private static string TwoLines(string second) => string.Join('\n', ["one", second, string.Empty]);
 
     private string Write(string name, string content)
     {

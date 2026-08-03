@@ -54,10 +54,14 @@ The moved-block list beneath jumps to any block.
 
 ## Interactive merge target
 
-The result starts as a copy of the right-hand file. `Take left` replaces the selected change run
-with the left side's version, `Undo` reverts the last action, and `Save…` writes the
-reconstructed file. Source files are never modified, and an existing file is never overwritten
-without an explicit confirmation (AC-010).
+The reconstructed result always mirrors the second pane — the target file of a two-way
+comparison, the local file of a three-way merge — so a resolution is always "use that version
+instead". `Take left` (or `Take base` and `Take remote` in a merge) replaces the selected change
+run, `Undo` reverts the last action, and `Save…` writes the result. Source files are never
+modified, and an existing file is never overwritten without an explicit confirmation (AC-010).
+
+A four-way comparison validates a candidate target rather than producing one, so it offers no
+resolution actions.
 
 ## Themes and markers
 

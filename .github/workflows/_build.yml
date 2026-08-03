@@ -64,6 +64,8 @@ jobs:
         run: |
           dotnet publish src/ShiftDiff.Cli/ShiftDiff.Cli.csproj -r win-x64   -c Release --self-contained -o dist/win-x64
           dotnet publish src/ShiftDiff.Cli/ShiftDiff.Cli.csproj -r linux-x64 -c Release --self-contained -o dist/linux-x64
+          dotnet publish src/ShiftDiff.App/ShiftDiff.App.csproj -r win-x64   -c Release --self-contained -o dist/win-x64/desktop
+          dotnet publish src/ShiftDiff.App/ShiftDiff.App.csproj -r linux-x64 -c Release --self-contained -o dist/linux-x64/desktop
       - uses: actions/upload-artifact@v4
         with:
           name: app-artifacts

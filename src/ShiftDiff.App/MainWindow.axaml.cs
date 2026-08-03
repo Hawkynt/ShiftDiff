@@ -243,6 +243,7 @@ public sealed partial class MainWindow : Window
             case nameof(ShellViewModel.Document):
                 ReplaceMovedBlocks();
                 UpdatePaneHeaders();
+                UpdateMergeState();
                 Overview.Stripes = _shell.Overview;
                 LanguageText.Text = $"Language: {_shell.LanguageName}";
                 SummaryText.Text = _shell.Summary.Text;
@@ -268,6 +269,7 @@ public sealed partial class MainWindow : Window
                 ChangePositionText.Text = _shell.ChangePositionText;
                 break;
             case nameof(ShellViewModel.MergedLineCount):
+            case nameof(ShellViewModel.CanResolve):
                 UpdateMergeState();
                 break;
             case nameof(ShellViewModel.IsRepositorySession):
@@ -443,9 +445,13 @@ public sealed partial class MainWindow : Window
 
     // --- interactive merge (FR-047) ---------------------------------------
 
-    private void OnTakeLeftBlock(object? sender, RoutedEventArgs e)
+    private void OnTakeLeftBlock(object? sender, RoutedEventArgs e) => TakeBlock(0);
+
+    private void OnTakeRemoteBlock(object? sender, RoutedEventArgs e) => TakeBlock(2);
+
+    private void TakeBlock(int pane)
     {
-        if (!_shell.TakeSelectedBlockFromLeft()) StatusText.Text = "Select a changed line first.";
+        if (!_shell.TakeSelectedBlock(pane)) StatusText.Text = "Select a changed line first.";
         UpdateMergeState();
     }
 
@@ -470,10 +476,17 @@ public sealed partial class MainWindow : Window
         UpdateMergeState();
     }
 
-    private void UpdateMergeState() =>
+    private void UpdateMergeState()
+    {
+        var merging = _shell.PaneTitles.Count == 3;
+
+        ResolvePanel.IsVisible = _shell.CanResolve;
+        TakeRemoteButton.IsVisible = merging;
+        TakeLeftButton.Content = merging ? "◀ Take base" : "◀ Take left";
         MergeStateText.Text = _shell.CanUndoMerge
             ? $"Result edited · {_shell.MergedLineCount} lines"
-            : "Result matches the right file";
+            : merging ? "Result matches the local file" : "Result matches the right file";
+    }
 
     // --- options ----------------------------------------------------------
 

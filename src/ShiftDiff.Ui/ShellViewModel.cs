@@ -282,6 +282,7 @@ public sealed class ShellViewModel : ObservableObject
 
     public async Task OpenThreeWayAsync(string basePath, string localPath, string remotePath)
     {
+        StartMergeDocument(File.ReadAllLines(localPath));
         await RunAnalysisAsync(token =>
         {
             var changes = ThreeWayComparer.Compare(
@@ -305,6 +306,7 @@ public sealed class ShellViewModel : ObservableObject
 
     public async Task OpenFourWayAsync(string basePath, string localPath, string remotePath, string targetPath)
     {
+        DiscardMergeDocument();
         await RunAnalysisAsync(token =>
         {
             var changes = ThreeWayComparer.Compare(
@@ -425,10 +427,19 @@ public sealed class ShellViewModel : ObservableObject
 
     // --- interactive merge (FR-047) ---------------------------------------
 
-    /// <summary>Replaces the selected block in the target with the source side's version.</summary>
-    public bool TakeSelectedBlockFromLeft()
+    /// <summary>Replaces the selected block in the result with the left pane's version.</summary>
+    public bool TakeSelectedBlockFromLeft() => TakeSelectedBlock(0);
+
+    /// <summary>
+    /// FR-047: replaces the selected change run in the reconstructed result with
+    /// one pane's version. The result mirrors the second pane's line numbering —
+    /// the target file in a two-way comparison, the local file in a merge — which
+    /// is what DiffRow.NewIndex carries in both cases.
+    /// </summary>
+    public bool TakeSelectedBlock(int sourcePane)
     {
         if (_merge is null) return false;
+        if (sourcePane < 0 || sourcePane >= Document.PaneCount) return false;
 
         var run = SelectedRunInDocument();
         if (run is not var (start, end)) return false;
@@ -440,29 +451,37 @@ public sealed class ShellViewModel : ObservableObject
         for (var i = start; i <= end; i++)
         {
             var row = Document.Rows[i];
-            if (row.Cells.Count < 2) continue;
+            if (row.Cells.Count <= sourcePane) continue;
 
-            if (row.OldIndex is not null && row.Cells[0].State != CellState.Empty) sourceLines.Add(row.Cells[0].Text);
-            if (row.NewIndex is not { } newIndex) continue;
+            if (row.Cells[sourcePane].State != CellState.Empty && row.Cells[sourcePane].LineNumber is not null)
+            {
+                sourceLines.Add(row.Cells[sourcePane].Text);
+            }
 
-            targetStart ??= newIndex;
+            if (row.NewIndex is not { } targetIndex) continue;
+
+            targetStart ??= targetIndex;
             targetCount++;
         }
 
         if (targetStart is null && sourceLines.Count == 0) return false;
 
+        var paneName = Document.PaneTitles.Count > sourcePane ? Document.PaneTitles[sourcePane] : "source";
         var block = new MergeSourceBlock(
-            "left", OldTitle ?? "left", start, end, sourceLines, Document.Rows[start].DisplayChangeType);
+            paneName, paneName, start, end, sourceLines, Document.Rows[start].DisplayChangeType);
 
         var insertionPoint = targetStart ?? EstimateInsertionPoint(start);
         if (targetCount > 0) _merge.Replace(block, insertionPoint, targetCount);
         else _merge.Insert(block, insertionPoint);
 
         MergedLineCount = _merge.Lines.Count;
-        StatusText = $"Took {sourceLines.Count} line(s) from the left side into the merged result";
+        StatusText = $"Took {sourceLines.Count} line(s) from {paneName} into the result";
         Raise(nameof(CanUndoMerge));
         return true;
     }
+
+    /// <summary>True once a session has a reconstructed result that can be edited and saved.</summary>
+    public bool CanResolve => _merge is not null;
 
     public bool UndoMerge()
     {
@@ -499,11 +518,26 @@ public sealed class ShellViewModel : ObservableObject
 
     public IReadOnlyList<string> MergedLines => _merge?.Lines ?? [];
 
-    private void StartMergeDocument(ComparisonInput input)
+    private void StartMergeDocument(ComparisonInput input) =>
+        StartMergeDocument(TextFileLoader.Load(input.NewContent).Lines);
+
+    // The result always mirrors the second pane: the target file of a two-way
+    // comparison, the local file of a merge. Everything else is "take that
+    // version instead".
+    private void StartMergeDocument(IReadOnlyList<string> targetLines)
     {
-        _merge = new InteractiveMergeDocument(TextFileLoader.Load(input.NewContent).Lines);
+        _merge = new InteractiveMergeDocument(targetLines);
         MergedLineCount = _merge.Lines.Count;
         Raise(nameof(CanUndoMerge));
+        Raise(nameof(CanResolve));
+    }
+
+    private void DiscardMergeDocument()
+    {
+        _merge = null;
+        MergedLineCount = 0;
+        Raise(nameof(CanUndoMerge));
+        Raise(nameof(CanResolve));
     }
 
     // The run of consecutive changed rows the cursor sits in.

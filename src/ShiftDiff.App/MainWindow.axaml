@@ -56,7 +56,7 @@
           <Button Classes="icon" Content="⇅" Click="OnNextMoved" ToolTip.Tip="Next moved block (Ctrl+F8)" />
           <Button Classes="icon" Content="⇄" Click="OnJumpToPair" ToolTip.Tip="Jump to the paired moved block (Ctrl+P)" />
           <Rectangle Width="1" Height="22" Fill="{DynamicResource BorderBrushColor}" Margin="4,0" />
-          <TextBox x:Name="SearchBox" Width="180" Watermark="Search in diff…" KeyUp="OnSearchChanged" />
+          <TextBox x:Name="SearchBox" Width="180" PlaceholderText="Search in diff…" KeyUp="OnSearchChanged" />
           <ComboBox x:Name="FilterSelector" Width="130" SelectionChanged="OnFilterChanged"
                     ToolTip.Tip="Filter by change type" />
         </StackPanel>
@@ -107,9 +107,9 @@
                     Margin="12,0,0,0">
           <StackPanel x:Name="RevisionBar" Orientation="Horizontal" Spacing="6" IsVisible="False">
             <TextBlock Text="REVISIONS" Classes="caption" VerticalAlignment="Center" />
-            <TextBox x:Name="FromRevisionBox" Width="110" Watermark="from" KeyUp="OnRevisionKeyUp" />
+            <TextBox x:Name="FromRevisionBox" Width="110" PlaceholderText="from" KeyUp="OnRevisionKeyUp" />
             <TextBlock Text="→" VerticalAlignment="Center" Classes="muted" />
-            <TextBox x:Name="ToRevisionBox" Width="110" Watermark="to" KeyUp="OnRevisionKeyUp" />
+            <TextBox x:Name="ToRevisionBox" Width="110" PlaceholderText="to" KeyUp="OnRevisionKeyUp" />
             <Button Content="Compare" Click="OnCompareRevisions" />
           </StackPanel>
           <TextBlock x:Name="DropHintText" Classes="muted" VerticalAlignment="Center"
@@ -127,7 +127,7 @@
         <Grid RowDefinitions="Auto,*">
           <StackPanel Margin="12,10,12,8" Spacing="6">
             <TextBlock Text="FILES" Classes="caption" />
-            <TextBox x:Name="FileFilterBox" Watermark="Filter files…" KeyUp="OnFileFilterChanged" />
+            <TextBox x:Name="FileFilterBox" PlaceholderText="Filter files…" KeyUp="OnFileFilterChanged" />
           </StackPanel>
           <ListBox Grid.Row="1" x:Name="FileList" Background="Transparent" BorderThickness="0"
                    SelectionChanged="OnFileSelected">
@@ -311,11 +311,13 @@
             </StackPanel>
           </Border>
 
-          <StackPanel Grid.Row="2" Margin="12,0,12,8" Spacing="6">
+          <StackPanel Grid.Row="2" x:Name="ResolvePanel" Margin="12,0,12,8" Spacing="6">
             <TextBlock Text="RESOLVE" Classes="caption" />
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <Button Content="◀ Take left" Click="OnTakeLeftBlock"
-                      ToolTip.Tip="Replace the selected block in the result with the left side's version" />
+              <Button x:Name="TakeLeftButton" Content="◀ Take left" Click="OnTakeLeftBlock"
+                      ToolTip.Tip="Replace the selected block in the result with the left pane's version" />
+              <Button x:Name="TakeRemoteButton" Content="Take remote ▶" Click="OnTakeRemoteBlock" IsVisible="False"
+                      ToolTip.Tip="Replace the selected block in the result with the remote pane's version" />
               <Button Content="↶ Undo" Click="OnUndoMerge" ToolTip.Tip="Undo the last resolve action" />
               <Button Content="Save…" Classes="accent" Click="OnSaveMerged"
                       ToolTip.Tip="Write the reconstructed result to a file" />
