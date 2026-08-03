@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShiftDiff.Core\ShiftDiff.Core.csproj" />
+    <ProjectReference Include="..\ShiftDiff.Vcs\ShiftDiff.Vcs.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

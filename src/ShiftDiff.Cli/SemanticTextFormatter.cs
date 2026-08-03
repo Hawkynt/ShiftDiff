@@ -17,14 +17,19 @@ public static class SemanticTextFormatter
         int contextLines = 3)
     {
         var changes = comparison.Changes;
+
+        // R-001: report the blocks that genuinely changed order, not every block
+        // that slid down because lines were inserted above it.
+        var movedBlocks = MoveRefiner.Refine(comparison.MovedBlocks);
+
         var lines = new List<string>
         {
             $"--- {oldPath}",
             $"+++ {newPath}",
-            Summary(language, comparison),
+            Summary(language, comparison, movedBlocks.Length),
         };
 
-        foreach (var block in comparison.MovedBlocks)
+        foreach (var block in movedBlocks)
         {
             lines.Add(FormatBlock(block, useEmoji));
         }
@@ -40,7 +45,7 @@ public static class SemanticTextFormatter
             lines.Add($"@@ -{hunk.OldStart},{hunk.OldCount} +{hunk.NewStart},{hunk.NewCount} @@");
             for (var i = hunk.StartIndex; i <= hunk.EndIndex; i++)
             {
-                lines.AddRange(FormatChange(changes[i], comparison.MovedBlocks, useEmoji, oldWidth, newWidth));
+                lines.AddRange(FormatChange(changes[i], movedBlocks, useEmoji, oldWidth, newWidth));
             }
         }
 
@@ -72,12 +77,12 @@ public static class SemanticTextFormatter
         return builder.ToString();
     }
 
-    private static string Summary(SourceLanguage language, FileComparisonResult comparison)
+    private static string Summary(SourceLanguage language, FileComparisonResult comparison, int movedBlockCount)
     {
         var added = comparison.Changes.Count(change => change.ChangeType == ChangeType.Added);
         var removed = comparison.Changes.Count(change => change.ChangeType == ChangeType.Removed);
         var edited = comparison.Changes.Count(change => change.ChangeType == ChangeType.Edited);
-        var moved = comparison.MovedBlocks.Length;
+        var moved = movedBlockCount;
         return $"# {SourceLanguageDetector.GetDisplayName(language)} · {added} added · {removed} removed · {edited} edited · {moved} moved block(s)";
     }
 

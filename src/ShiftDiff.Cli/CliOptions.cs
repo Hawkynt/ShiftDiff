@@ -66,11 +66,9 @@ public static class CliOptionsParser
         var command = ReadCommand(args[0]);
         var rest = command is null ? args : args.Skip(1).ToArray();
 
-        if (command is CliCommand.Git or CliCommand.Svn)
-        {
-            return CliParseResult.Ok(new CliOptions(command.Value, rest));
-        }
-
+        // `git`/`svn` forward their own verbs and flags to the provider, so an
+        // unrecognized option there is passed through instead of rejected.
+        var passThroughUnknownOptions = command is CliCommand.Git or CliCommand.Svn;
         var operands = new List<string>();
         var options = new CliOptions(command ?? CliCommand.Compare, operands);
         string? patchPath = null;
@@ -155,7 +153,10 @@ public static class CliOptionsParser
                 continue;
             }
 
-            if (argument.StartsWith('-') && argument.Length > 1) return CliParseResult.Fail($"unknown option '{argument}'");
+            if (argument.StartsWith('-') && argument.Length > 1 && !passThroughUnknownOptions)
+            {
+                return CliParseResult.Fail($"unknown option '{argument}'");
+            }
 
             operands.Add(argument);
         }

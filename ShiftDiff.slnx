@@ -3,10 +3,12 @@
     <Project Path="src/ShiftDiff.App/ShiftDiff.App.csproj" />
     <Project Path="src/ShiftDiff.Cli/ShiftDiff.Cli.csproj" />
     <Project Path="src/ShiftDiff.Core/ShiftDiff.Core.csproj" />
+    <Project Path="src/ShiftDiff.Vcs/ShiftDiff.Vcs.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ShiftDiff.Core.Tests/ShiftDiff.Core.Tests.csproj" />
     <Project Path="tests/ShiftDiff.Cli.Tests/ShiftDiff.Cli.Tests.csproj" />
+    <Project Path="tests/ShiftDiff.Vcs.Tests/ShiftDiff.Vcs.Tests.csproj" />
   </Folder>
 </Solution>
 
