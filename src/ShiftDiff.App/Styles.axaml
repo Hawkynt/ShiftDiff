@@ -1,0 +1,213 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Chrome  -->
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource ShellBrush}" />
+    <Setter Property="TransparencyLevelHint" Value="None" />
+  </Style>
+
+  <Style Selector="TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.caption">
+    <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="1" />
+  </Style>
+
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+
+  <Style Selector="Button">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="MinWidth" Value="0" />
+  </Style>
+
+  <Style Selector="Button:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <Style Selector="Button.accent">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="Button.icon">
+    <Setter Property="Padding" Value="7,4" />
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="MinHeight" Value="28" />
+  </Style>
+
+  <Style Selector="CheckBox">
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+
+  <Style Selector="ToggleButton">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="9,4" />
+  </Style>
+
+  <Style Selector="ToggleButton:checked /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+  </Style>
+
+  <!-- Diff rows  -->
+  <Style Selector="ListBox.diff">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="ListBox.diff ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ListBox.diff ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Border.cell">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0,0,0,0" />
+  </Style>
+
+  <Style Selector="Border.cell.added">
+    <Setter Property="Background" Value="{DynamicResource AddedBrush}" />
+  </Style>
+
+  <Style Selector="Border.cell.removed">
+    <Setter Property="Background" Value="{DynamicResource RemovedBrush}" />
+  </Style>
+
+  <Style Selector="Border.cell.edited">
+    <Setter Property="Background" Value="{DynamicResource EditedBrush}" />
+  </Style>
+
+  <Style Selector="Border.cell.moved">
+    <Setter Property="Background" Value="{DynamicResource MovedBrush}" />
+  </Style>
+
+  <Style Selector="Border.cell.conflict">
+    <Setter Property="Background" Value="{DynamicResource ConflictBrush}" />
+  </Style>
+
+  <Style Selector="Border.cell.empty">
+    <Setter Property="Background" Value="{DynamicResource EmptyBrush}" />
+  </Style>
+
+  <!-- Intra-line token runs  -->
+  <Style Selector="TextBlock.seg">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.seg.keyword">
+    <Setter Property="Foreground" Value="{DynamicResource SyntaxKeywordBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.seg.str">
+    <Setter Property="Foreground" Value="{DynamicResource SyntaxStringBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.seg.comment">
+    <Setter Property="Foreground" Value="{DynamicResource SyntaxCommentBrush}" />
+    <Setter Property="FontStyle" Value="Italic" />
+  </Style>
+
+  <Style Selector="TextBlock.seg.number">
+    <Setter Property="Foreground" Value="{DynamicResource SyntaxNumberBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.seg.op">
+    <Setter Property="Foreground" Value="{DynamicResource SyntaxOperatorBrush}" />
+  </Style>
+
+  <Style Selector="Border.run">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+
+  <Style Selector="Border.run.added">
+    <Setter Property="Background" Value="{DynamicResource AddedStrongBrush}" />
+  </Style>
+
+  <Style Selector="Border.run.removed">
+    <Setter Property="Background" Value="{DynamicResource RemovedStrongBrush}" />
+  </Style>
+
+  <!-- Markers  -->
+  <Style Selector="TextBlock.marker">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.marker.added">
+    <Setter Property="Foreground" Value="{DynamicResource AddedAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.marker.removed">
+    <Setter Property="Foreground" Value="{DynamicResource RemovedAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.marker.edited">
+    <Setter Property="Foreground" Value="{DynamicResource EditedAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.marker.moved">
+    <Setter Property="Foreground" Value="{DynamicResource MovedAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.marker.conflict">
+    <Setter Property="Foreground" Value="{DynamicResource ConflictAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.linenumber">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="Foreground" Value="{DynamicResource LineNumberBrush}" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+
+</Styles>

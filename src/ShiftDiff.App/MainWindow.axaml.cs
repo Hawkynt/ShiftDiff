@@ -1,23 +1,35 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
+using ShiftDiff.App.Controls;
 using ShiftDiff.Core;
+using ShiftDiff.Ui;
 
 namespace ShiftDiff.App;
 
+// The window is a thin shell over ShellViewModel: it translates gestures into
+// view-model calls and view-model state into controls. All comparison and
+// presentation logic lives in ShiftDiff.Ui, where it is unit-tested.
 public sealed partial class MainWindow : Window
 {
-    private readonly ObservableCollection<DiffRowViewModel> _rows = [];
-    private readonly ObservableCollection<MovedBlockViewModel> _movedBlocks = [];
-    private string? _oldPath;
-    private string? _newPath;
-    private int _currentChange = -1;
+    public static readonly StyledProperty<bool> UseEmojiMarkersProperty =
+        AvaloniaProperty.Register<MainWindow, bool>(nameof(UseEmojiMarkers), true);
+
+    private readonly ShellViewModel _shell = new();
+    private readonly ObservableCollection<DiffRow> _rows = [];
+    private readonly ObservableCollection<FileListEntry> _files = [];
+    private readonly ObservableCollection<MovedBlockInfo> _movedBlocks = [];
+    private readonly ObservableCollection<DetailEntry> _detailEntries = [];
+    private ScrollViewer? _diffScroll;
+    private bool _suppressSelection;
 
     public MainWindow() : this([]) { }
 
@@ -25,286 +37,411 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
-        DiffListControl.ItemsSource = _rows;
-        MovedBlocksListControl.ItemsSource = _movedBlocks;
-        WhitespaceSelectorControl.ItemsSource = Enum.GetValues<WhitespaceMode>();
-        WhitespaceSelectorControl.SelectedItem = WhitespaceMode.None;
-        DetectionSelectorControl.ItemsSource = Enum.GetValues<DetectionMode>();
-        DetectionSelectorControl.SelectedItem = DetectionMode.Balanced;
-        ThemeSelectorControl.ItemsSource = new[] { "Dark", "Light", "System" };
-        ThemeSelectorControl.SelectedIndex = 0;
+        NextChangeCommand = new RelayCommand(_shell.GoToNextChange);
+        PreviousChangeCommand = new RelayCommand(_shell.GoToPreviousChange);
+        NextConflictCommand = new RelayCommand(_shell.GoToNextConflict);
+        NextMovedCommand = new RelayCommand(_shell.GoToNextMovedBlock);
+        JumpToPairCommand = new RelayCommand(_shell.GoToPairedBlock);
+        RefreshCommand = new RelayCommand(() => _ = _shell.RefreshAsync());
+        FocusSearchCommand = new RelayCommand(() => SearchBox.Focus());
 
+        DiffList.ItemsSource = _rows;
+        FileList.ItemsSource = _files;
+        MovedBlocksList.ItemsSource = _movedBlocks;
+        DetailEntries.ItemsSource = _detailEntries;
+
+        PopulateSelectors();
+        _shell.PropertyChanged += OnShellPropertyChanged;
+        _shell.FileCollection.CollectionChanged += (_, _) => RefreshFileList();
+        Overview.PositionPicked += (_, position) => _shell.GoToOverviewPosition(position);
+
+        DragDrop.SetAllowDrop(this, true);
         DragDrop.AddDragOverHandler(this, OnDragOver);
         DragDrop.AddDropHandler(this, OnDrop);
 
-        if (args.Count >= 2)
+        DiffList.DoubleTapped += OnRowDoubleTapped;
+
+        Opened += async (_, _) =>
         {
-            _oldPath = args[0];
-            _newPath = args[1];
-            Opened += async (_, _) => await CompareAsync();
-        }
+            HookScrollViewer();
+            if (args.Count > 0) await _shell.OpenDroppedAsync([.. args]);
+        };
     }
 
-    private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
+    public ICommand NextChangeCommand { get; }
 
-    private TextBlock OldPathLabel => this.FindControl<TextBlock>("OldPathText")!;
-    private TextBlock NewPathLabel => this.FindControl<TextBlock>("NewPathText")!;
-    private TextBlock LanguageLabel => this.FindControl<TextBlock>("LanguageText")!;
-    private TextBlock SummaryLabel => this.FindControl<TextBlock>("SummaryText")!;
-    private TextBlock StatusLabel => this.FindControl<TextBlock>("StatusText")!;
-    private ProgressBar BusyIndicatorControl => this.FindControl<ProgressBar>("BusyIndicator")!;
-    private ListBox DiffListControl => this.FindControl<ListBox>("DiffList")!;
-    private ListBox MovedBlocksListControl => this.FindControl<ListBox>("MovedBlocksList")!;
-    private ComboBox WhitespaceSelectorControl => this.FindControl<ComboBox>("WhitespaceSelector")!;
-    private ComboBox DetectionSelectorControl => this.FindControl<ComboBox>("DetectionSelector")!;
-    private ComboBox ThemeSelectorControl => this.FindControl<ComboBox>("ThemeSelector")!;
-    private CheckBox IgnoreCaseCheckControl => this.FindControl<CheckBox>("IgnoreCaseCheck")!;
+    public ICommand PreviousChangeCommand { get; }
 
-    private async void OnOpenOld(object? sender, RoutedEventArgs e)
+    public ICommand NextConflictCommand { get; }
+
+    public ICommand NextMovedCommand { get; }
+
+    public ICommand JumpToPairCommand { get; }
+
+    public ICommand RefreshCommand { get; }
+
+    public ICommand FocusSearchCommand { get; }
+
+    /// <summary>Bound by the row template to pick between emoji and text markers (FR-043).</summary>
+    public bool UseEmojiMarkers
     {
-        if (await PickFileAsync("Open original source") is { } path)
-        {
-            _oldPath = path;
-            await CompareWhenReadyAsync();
-        }
+        get => GetValue(UseEmojiMarkersProperty);
+        set => SetValue(UseEmojiMarkersProperty, value);
     }
 
-    private async void OnOpenNew(object? sender, RoutedEventArgs e)
+    // --- setup -------------------------------------------------------------
+
+    private void PopulateSelectors()
     {
-        if (await PickFileAsync("Open changed source") is { } path)
+        DetectionSelector.ItemsSource = Enum.GetValues<DetectionMode>();
+        DetectionSelector.SelectedItem = _shell.Settings.Detection;
+        WhitespaceSelector.ItemsSource = Enum.GetValues<WhitespaceMode>();
+        WhitespaceSelector.SelectedItem = _shell.Settings.Whitespace;
+        LayoutSelector.ItemsSource = new[] { "Side by side", "Unified" };
+        LayoutSelector.SelectedIndex = 0;
+        ThemeSelector.ItemsSource = Enum.GetValues<ThemeMode>();
+        ThemeSelector.SelectedItem = _shell.Settings.Theme;
+        FilterSelector.ItemsSource = new[] { "All rows", "Only changes", "Added", "Removed", "Edited", "Moved", "Conflicts" };
+        FilterSelector.SelectedIndex = 0;
+
+        CollapseCheck.IsChecked = _shell.Settings.CollapseUnchanged;
+        SyntaxCheck.IsChecked = _shell.Settings.SyntaxHighlighting;
+        EmojiCheck.IsChecked = _shell.Settings.ShowEmojiMarkers;
+        IgnoreCaseCheck.IsChecked = _shell.Settings.IgnoreCase;
+        SidebarCheck.IsChecked = true;
+        InspectorCheck.IsChecked = true;
+        UseEmojiMarkers = _shell.Settings.ShowEmojiMarkers;
+    }
+
+    private void HookScrollViewer()
+    {
+        _diffScroll = DiffList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (_diffScroll is null) return;
+
+        _diffScroll.ScrollChanged += (_, _) => UpdateViewportIndicator();
+        UpdateViewportIndicator();
+    }
+
+    private void UpdateViewportIndicator()
+    {
+        if (_diffScroll is null || _rows.Count == 0) return;
+
+        var extent = _diffScroll.Extent.Height;
+        if (extent <= 0) return;
+
+        Overview.ViewportStart = _diffScroll.Offset.Y / extent;
+        Overview.ViewportEnd = (_diffScroll.Offset.Y + _diffScroll.Viewport.Height) / extent;
+    }
+
+    // --- view-model plumbing ----------------------------------------------
+
+    private void OnShellPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
         {
-            _newPath = path;
-            await CompareWhenReadyAsync();
+            case nameof(ShellViewModel.VisibleRows):
+                ReplaceRows();
+                break;
+            case nameof(ShellViewModel.Document):
+                ReplaceMovedBlocks();
+                UpdatePaneHeaders();
+                Overview.Stripes = _shell.Overview;
+                LanguageText.Text = $"Language: {_shell.LanguageName}";
+                SummaryText.Text = _shell.Summary.Text;
+                break;
+            case nameof(ShellViewModel.StatusText):
+                StatusText.Text = _shell.StatusText;
+                break;
+            case nameof(ShellViewModel.SessionTitle):
+                SessionTitleText.Text = _shell.SessionTitle;
+                Title = $"ShiftDiff — {_shell.SessionTitle}";
+                break;
+            case nameof(ShellViewModel.IsBusy):
+                BusyIndicator.IsVisible = _shell.IsBusy;
+                CancelButton.IsVisible = _shell.IsBusy;
+                break;
+            case nameof(ShellViewModel.Details):
+                UpdateDetails();
+                break;
+            case nameof(ShellViewModel.SelectedRow):
+                SyncSelection();
+                break;
+            case nameof(ShellViewModel.ChangePositionText):
+                ChangePositionText.Text = _shell.ChangePositionText;
+                break;
         }
     }
 
-    private async void OnCompare(object? sender, RoutedEventArgs e) => await CompareAsync();
+    private void ReplaceRows()
+    {
+        _suppressSelection = true;
+        _rows.Clear();
+        foreach (var row in _shell.VisibleRows) _rows.Add(row);
+        _suppressSelection = false;
+        UpdateViewportIndicator();
+    }
+
+    private void ReplaceMovedBlocks()
+    {
+        _movedBlocks.Clear();
+        foreach (var block in _shell.MovedBlocks) _movedBlocks.Add(block);
+    }
+
+    private void UpdatePaneHeaders() => PaneHeaders.ItemsSource = _shell.PaneTitles;
+
+    private void UpdateDetails()
+    {
+        DetailTitleText.Text = _shell.Details.Title;
+        DetailSubtitleText.Text = _shell.Details.Subtitle;
+        _detailEntries.Clear();
+        foreach (var entry in _shell.Details.Entries) _detailEntries.Add(entry);
+    }
+
+    private void SyncSelection()
+    {
+        if (_shell.SelectedRow < 0 || _shell.SelectedRow >= _rows.Count) return;
+
+        _suppressSelection = true;
+        DiffList.SelectedIndex = _shell.SelectedRow;
+        DiffList.ScrollIntoView(_rows[_shell.SelectedRow]);
+        _suppressSelection = false;
+
+        Overview.CursorPosition = _rows.Count == 0 ? -1 : (double)_shell.SelectedRow / _rows.Count;
+        ChangePositionText.Text = _shell.ChangePositionText;
+    }
+
+    // --- toolbar ----------------------------------------------------------
+
+    private async void OnOpenPair(object? sender, RoutedEventArgs e)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Pick two files to compare",
+            AllowMultiple = true,
+        });
+
+        var paths = files.Select(file => file.Path.LocalPath).ToArray();
+        if (paths.Length >= 2) await _shell.OpenDroppedAsync(paths);
+    }
+
+    private async void OnOpenFolders(object? sender, RoutedEventArgs e)
+    {
+        var left = await PickFolderAsync("Pick the original folder");
+        if (left is null) return;
+        var right = await PickFolderAsync("Pick the changed folder");
+        if (right is null) return;
+
+        await _shell.OpenFolderPairAsync(left, right);
+    }
+
+    private async void OnOpenRepository(object? sender, RoutedEventArgs e)
+    {
+        if (await PickFolderAsync("Pick a Git or SVN working copy") is { } path)
+        {
+            await _shell.OpenRepositoryAsync(path);
+        }
+    }
 
     private async void OnSwap(object? sender, RoutedEventArgs e)
     {
-        (_oldPath, _newPath) = (_newPath, _oldPath);
-        await CompareWhenReadyAsync();
+        if (_shell.OldTitle is not { } oldPath || _shell.NewTitle is not { } newPath) return;
+        if (!File.Exists(oldPath) || !File.Exists(newPath)) return;
+
+        await _shell.OpenFilePairAsync(newPath, oldPath);
     }
 
-    private void OnPreviousChange(object? sender, RoutedEventArgs e) => NavigateChange(-1);
+    private async void OnExportPatch(object? sender, RoutedEventArgs e)
+    {
+        if (_shell.OldTitle is not { } oldPath || _shell.NewTitle is not { } newPath) return;
 
-    private void OnNextChange(object? sender, RoutedEventArgs e) => NavigateChange(1);
+        var target = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export unified diff",
+            SuggestedFileName = Path.GetFileNameWithoutExtension(newPath) + ".diff",
+            DefaultExtension = "diff",
+        });
+
+        if (target is null) return;
+
+        try
+        {
+            var result = FileComparer.CompareSourceFiles(
+                await File.ReadAllBytesAsync(oldPath), await File.ReadAllBytesAsync(newPath), oldPath, newPath,
+                _shell.Settings.IgnoreCase, _shell.Settings.Whitespace, _shell.Settings.Detection);
+            var file = UnifiedDiffBuilder.Build(result.Comparison.Changes, oldPath, newPath, _shell.Settings.ContextLines);
+            await File.WriteAllLinesAsync(target.Path.LocalPath, UnifiedDiffFormatter.Format(file));
+            StatusText.Text = $"Patch written to {target.Path.LocalPath}";
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = $"Export failed: {exception.Message}";
+        }
+    }
+
+    private void OnFirstChange(object? sender, RoutedEventArgs e)
+    {
+        _shell.SelectedRow = -1;
+        _shell.GoToNextChange();
+    }
+
+    private void OnLastChange(object? sender, RoutedEventArgs e)
+    {
+        _shell.SelectedRow = _rows.Count;
+        _shell.GoToPreviousChange();
+    }
+
+    private void OnPreviousChange(object? sender, RoutedEventArgs e) => _shell.GoToPreviousChange();
+
+    private void OnNextChange(object? sender, RoutedEventArgs e) => _shell.GoToNextChange();
+
+    private void OnNextConflict(object? sender, RoutedEventArgs e) => _shell.GoToNextConflict();
+
+    private void OnNextMoved(object? sender, RoutedEventArgs e) => _shell.GoToNextMovedBlock();
+
+    private void OnJumpToPair(object? sender, RoutedEventArgs e) => _shell.GoToPairedBlock();
+
+    private void OnCancel(object? sender, RoutedEventArgs e) => _shell.CancelAnalysis();
+
+    // --- options ----------------------------------------------------------
+
+    private void OnDetectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DetectionSelector.SelectedItem is DetectionMode mode)
+        {
+            _shell.Settings.Detection = mode;
+            ModeText.Text = mode.ToString();
+        }
+    }
+
+    private void OnWhitespaceChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (WhitespaceSelector.SelectedItem is WhitespaceMode mode) _shell.Settings.Whitespace = mode;
+    }
+
+    private void OnIgnoreCaseChanged(object? sender, RoutedEventArgs e) =>
+        _shell.Settings.IgnoreCase = IgnoreCaseCheck.IsChecked == true;
+
+    private void OnCollapseChanged(object? sender, RoutedEventArgs e) =>
+        _shell.Settings.CollapseUnchanged = CollapseCheck.IsChecked == true;
+
+    private void OnSyntaxChanged(object? sender, RoutedEventArgs e) =>
+        _shell.Settings.SyntaxHighlighting = SyntaxCheck.IsChecked == true;
+
+    private void OnEmojiChanged(object? sender, RoutedEventArgs e)
+    {
+        _shell.Settings.ShowEmojiMarkers = EmojiCheck.IsChecked == true;
+        UseEmojiMarkers = EmojiCheck.IsChecked == true;
+    }
+
+    private void OnSidebarChanged(object? sender, RoutedEventArgs e) =>
+        SidebarPanel.IsVisible = SidebarCheck.IsChecked == true && _shell.ShowFileList;
+
+    private void OnInspectorChanged(object? sender, RoutedEventArgs e) =>
+        InspectorPanel.IsVisible = InspectorCheck.IsChecked == true;
+
+    private void OnLayoutChanged(object? sender, SelectionChangedEventArgs e) =>
+        _shell.Settings.Layout = LayoutSelector.SelectedIndex == 1 ? PaneLayout.Unified : PaneLayout.SideBySide;
 
     private void OnThemeChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (Application.Current is null || ThemeSelectorControl.SelectedItem is not string theme) return;
+        if (Application.Current is null || ThemeSelector.SelectedItem is not ThemeMode theme) return;
+
+        _shell.Settings.Theme = theme;
         Application.Current.RequestedThemeVariant = theme switch
         {
-            "Dark" => ThemeVariant.Dark,
-            "Light" => ThemeVariant.Light,
+            ThemeMode.Dark => ThemeVariant.Dark,
+            ThemeMode.Light => ThemeVariant.Light,
             _ => ThemeVariant.Default,
         };
     }
 
-    private void OnDragOver(object? sender, DragEventArgs e)
+    private void OnFilterChanged(object? sender, SelectionChangedEventArgs e) =>
+        _shell.Filter = FilterSelector.SelectedIndex switch
+        {
+            1 => ChangeTypeFilter.OnlyChanges,
+            2 => ChangeTypeFilter.Added,
+            3 => ChangeTypeFilter.Removed,
+            4 => ChangeTypeFilter.Edited,
+            5 => ChangeTypeFilter.Moved,
+            6 => ChangeTypeFilter.Conflict,
+            _ => ChangeTypeFilter.All,
+        };
+
+    private void OnSearchChanged(object? sender, KeyEventArgs e) => _shell.SearchText = SearchBox.Text ?? string.Empty;
+
+    private void OnFileFilterChanged(object? sender, KeyEventArgs e) => RefreshFileList();
+
+    private void RefreshFileList()
     {
+        var filter = FileFilterBox.Text ?? string.Empty;
+
+        _suppressSelection = true;
+        _files.Clear();
+        foreach (var entry in _shell.Files.Where(entry =>
+                     filter.Length == 0 || entry.DisplayPath.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+        {
+            _files.Add(entry);
+        }
+
+        FileList.SelectedItem = _shell.SelectedFile;
+        _suppressSelection = false;
+
+        // A single-file session has nothing to pick from; keep the space for the diff.
+        SidebarPanel.IsVisible = SidebarCheck.IsChecked == true && _shell.ShowFileList;
+    }
+
+    // --- selection --------------------------------------------------------
+
+    private void OnRowSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSelection) return;
+
+        _shell.SelectedRow = DiffList.SelectedIndex;
+        Overview.CursorPosition = _rows.Count == 0 ? -1 : (double)DiffList.SelectedIndex / _rows.Count;
+    }
+
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DiffList.SelectedItem is DiffRow { Kind: DiffRowKind.Collapsed } row) _shell.ExpandRegion(row);
+    }
+
+    private void OnFileSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSelection) return;
+        if (FileList.SelectedItem is FileListEntry entry) _shell.SelectedFile = entry;
+    }
+
+    private void OnMovedBlockSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (MovedBlocksList.SelectedItem is MovedBlockInfo block) _shell.GoToMovedBlock(block);
+    }
+
+    // --- drag and drop ----------------------------------------------------
+
+    private void OnDragOver(object? sender, DragEventArgs e) =>
         e.DragEffects = e.DataTransfer.Formats.Contains(DataFormat.File)
             ? DragDropEffects.Copy
             : DragDropEffects.None;
-    }
 
     private async void OnDrop(object? sender, DragEventArgs e)
     {
         var paths = e.DataTransfer.TryGetFiles()?
-            .OfType<IStorageFile>()
-            .Select(file => file.Path.LocalPath)
-            .Where(File.Exists)
-            .Take(2)
+            .Select(item => item.Path.LocalPath)
+            .Where(path => File.Exists(path) || Directory.Exists(path))
+            .Take(4)
             .ToArray();
 
-        if (paths is not { Length: > 0 }) return;
-
-        if (paths.Length == 2)
-        {
-            _oldPath = paths[0];
-            _newPath = paths[1];
-        }
-        else if (_oldPath is null)
-        {
-            _oldPath = paths[0];
-        }
-        else
-        {
-            _newPath = paths[0];
-        }
-
-        await CompareWhenReadyAsync();
+        if (paths is { Length: > 0 }) await _shell.OpenDroppedAsync(paths);
     }
 
-    private async Task<string?> PickFileAsync(string title)
+    private async Task<string?> PickFolderAsync(string title)
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter =
-            [
-                new FilePickerFileType("Source and text files") { Patterns = ["*.cs", "*.pl", "*.pm", "*.py", "*.php", "*.go", "*.rs", "*.c", "*.h", "*.cpp", "*.hpp", "*.vb", "*.vbs", "*.rb", "*.js", "*.ts", "*.java", "*.html", "*.css", "*.sql", "*.txt"] },
-                FilePickerFileTypes.All,
-            ],
         });
 
-        return files.FirstOrDefault()?.Path.LocalPath;
+        return folders.FirstOrDefault()?.Path.LocalPath;
     }
-
-    private async Task CompareWhenReadyAsync()
-    {
-        UpdatePaths();
-        if (_oldPath is not null && _newPath is not null) await CompareAsync();
-    }
-
-    private async Task CompareAsync()
-    {
-        UpdatePaths();
-        if (_oldPath is null || _newPath is null)
-        {
-            StatusLabel.Text = "Choose an old and a new file first.";
-            return;
-        }
-
-        try
-        {
-            SetBusy(true, "Reading and analysing source files…");
-            var oldBytesTask = File.ReadAllBytesAsync(_oldPath);
-            var newBytesTask = File.ReadAllBytesAsync(_newPath);
-            await Task.WhenAll(oldBytesTask, newBytesTask);
-
-            var oldPath = _oldPath;
-            var newPath = _newPath;
-            var whitespace = WhitespaceSelectorControl.SelectedItem is WhitespaceMode selectedWhitespace ? selectedWhitespace : WhitespaceMode.None;
-            var detection = DetectionSelectorControl.SelectedItem is DetectionMode selectedDetection ? selectedDetection : DetectionMode.Balanced;
-            var ignoreCase = IgnoreCaseCheckControl.IsChecked == true;
-
-            var result = await Task.Run(() => FileComparer.CompareSourceFiles(
-                oldBytesTask.Result,
-                newBytesTask.Result,
-                oldPath,
-                newPath,
-                ignoreCase,
-                whitespace,
-                detection));
-
-            Present(result);
-        }
-        catch (Exception exception)
-        {
-            StatusLabel.Text = $"Comparison failed: {exception.Message}";
-        }
-        finally
-        {
-            SetBusy(false);
-        }
-    }
-
-    private void Present(SourceFileComparisonResult sourceResult)
-    {
-        _rows.Clear();
-        _movedBlocks.Clear();
-        _currentChange = -1;
-
-        var comparison = sourceResult.Comparison;
-        foreach (var change in comparison.Changes)
-        {
-            var moved = comparison.MovedBlocks.Any(block =>
-                (change.OldIndex is { } oldIndex && oldIndex >= block.OldStart && oldIndex <= block.OldEnd)
-                || (change.NewIndex is { } newIndex && newIndex >= block.NewStart && newIndex <= block.NewEnd));
-            _rows.Add(DiffRowViewModel.From(change, moved));
-        }
-
-        foreach (var block in comparison.MovedBlocks)
-        {
-            _movedBlocks.Add(new MovedBlockViewModel(
-                $"{block.MatchType} · {block.Confidence}",
-                $"old {block.OldStart + 1}–{block.OldEnd + 1} → new {block.NewStart + 1}–{block.NewEnd + 1} · {block.Score:P0}"));
-        }
-
-        var added = comparison.Changes.Count(change => change.ChangeType == ChangeType.Added);
-        var removed = comparison.Changes.Count(change => change.ChangeType == ChangeType.Removed);
-        var edited = comparison.Changes.Count(change => change.ChangeType == ChangeType.Edited);
-        LanguageLabel.Text = $"Language: {SourceLanguageDetector.GetDisplayName(sourceResult.Language)}";
-        SummaryLabel.Text = $"{added} added · {removed} removed · {edited} edited · {comparison.MovedBlocks.Length} moved blocks";
-        StatusLabel.Text = $"Compared {Path.GetFileName(_oldPath)} with {Path.GetFileName(_newPath)}";
-    }
-
-    private void NavigateChange(int direction)
-    {
-        if (_rows.Count == 0) return;
-
-        for (var attempts = 0; attempts < _rows.Count; attempts++)
-        {
-            _currentChange = (_currentChange + direction + _rows.Count) % _rows.Count;
-            if (!_rows[_currentChange].IsChanged) continue;
-            DiffListControl.SelectedIndex = _currentChange;
-            DiffListControl.ScrollIntoView(_rows[_currentChange]);
-            return;
-        }
-    }
-
-    private void UpdatePaths()
-    {
-        OldPathLabel.Text = _oldPath ?? "Drop or open the original file";
-        NewPathLabel.Text = _newPath ?? "Drop or open the changed file";
-    }
-
-    private void SetBusy(bool isBusy, string? status = null)
-    {
-        BusyIndicatorControl.IsVisible = isBusy;
-        if (status is not null) StatusLabel.Text = status;
-    }
-}
-
-public sealed record MovedBlockViewModel(string Title, string Detail);
-
-public sealed record DiffRowViewModel(
-    string Marker,
-    IBrush MarkerForeground,
-    IBrush GutterBackground,
-    IBrush OldBackground,
-    IBrush NewBackground,
-    string OldLineNumber,
-    string OldLine,
-    string NewLineNumber,
-    string NewLine,
-    bool IsChanged)
-{
-    private static readonly IBrush Transparent = Brushes.Transparent;
-    private static readonly IBrush Gutter = Brush("#181D24");
-    private static readonly IBrush Added = Brush("#173527");
-    private static readonly IBrush Removed = Brush("#3A2027");
-    private static readonly IBrush Edited = Brush("#39331F");
-    private static readonly IBrush AddedForeground = Brush("#66C58A");
-    private static readonly IBrush RemovedForeground = Brush("#D97882");
-    private static readonly IBrush EditedForeground = Brush("#E0C56A");
-    private static readonly IBrush MovedForeground = Brush("#B6A8FF");
-
-    public static DiffRowViewModel From(LineChange change, bool moved)
-    {
-        var (marker, markerForeground, oldBackground, newBackground) = change.ChangeType switch
-        {
-            ChangeType.Added => ("+", AddedForeground, Transparent, Added),
-            ChangeType.Removed => ("−", RemovedForeground, Removed, Transparent),
-            ChangeType.Edited => ("~", EditedForeground, Edited, Edited),
-            _ when moved => ("M", MovedForeground, Transparent, Transparent),
-            _ => ("", Brushes.Transparent, Transparent, Transparent),
-        };
-
-        return new DiffRowViewModel(
-            marker,
-            markerForeground,
-            Gutter,
-            oldBackground,
-            newBackground,
-            change.OldIndex is { } oldIndex ? (oldIndex + 1).ToString() : "",
-            change.OldLine ?? "",
-            change.NewIndex is { } newIndex ? (newIndex + 1).ToString() : "",
-            change.NewLine ?? "",
-            change.ChangeType != ChangeType.Unchanged || moved);
-    }
-
-    private static IBrush Brush(string color) => new SolidColorBrush(Color.Parse(color));
 }

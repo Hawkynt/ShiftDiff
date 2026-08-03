@@ -1,0 +1,82 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+
+    <!-- Each variant declares the brushes themselves: a shared brush whose Color
+         is a DynamicResource does not re-resolve when the variant changes. -->
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="ShellBrush" Color="#0F1216" />
+      <SolidColorBrush x:Key="ChromeBrush" Color="#161B22" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#12161C" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#1A1F27" />
+      <SolidColorBrush x:Key="BorderBrushColor" Color="#2A3038" />
+      <SolidColorBrush x:Key="SubtleBorderBrush" Color="#222831" />
+      <SolidColorBrush x:Key="TextBrush" Color="#DEE4EC" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#8792A2" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#6E56E8" />
+      <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="GutterBrush" Color="#141920" />
+      <SolidColorBrush x:Key="LineNumberBrush" Color="#5C6675" />
+
+      <SolidColorBrush x:Key="AddedBrush" Color="#12301F" />
+      <SolidColorBrush x:Key="AddedStrongBrush" Color="#1F6B3F" />
+      <SolidColorBrush x:Key="AddedAccentBrush" Color="#57C98A" />
+      <SolidColorBrush x:Key="RemovedBrush" Color="#33161C" />
+      <SolidColorBrush x:Key="RemovedStrongBrush" Color="#7A2733" />
+      <SolidColorBrush x:Key="RemovedAccentBrush" Color="#E0808C" />
+      <SolidColorBrush x:Key="EditedBrush" Color="#2C2716" />
+      <SolidColorBrush x:Key="EditedAccentBrush" Color="#E3C46A" />
+      <SolidColorBrush x:Key="MovedBrush" Color="#1E2039" />
+      <SolidColorBrush x:Key="MovedAccentBrush" Color="#A99BFF" />
+      <SolidColorBrush x:Key="ConflictBrush" Color="#3A1B12" />
+      <SolidColorBrush x:Key="ConflictAccentBrush" Color="#F09055" />
+      <SolidColorBrush x:Key="EmptyBrush" Color="#0B0E12" />
+      <SolidColorBrush x:Key="SelectionBrush" Color="#2A3350" />
+
+      <SolidColorBrush x:Key="SyntaxKeywordBrush" Color="#C792EA" />
+      <SolidColorBrush x:Key="SyntaxStringBrush" Color="#C3E88D" />
+      <SolidColorBrush x:Key="SyntaxCommentBrush" Color="#5F6B7C" />
+      <SolidColorBrush x:Key="SyntaxNumberBrush" Color="#F78C6C" />
+      <SolidColorBrush x:Key="SyntaxOperatorBrush" Color="#89DDFF" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="ShellBrush" Color="#F3F5F8" />
+      <SolidColorBrush x:Key="ChromeBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#F7F9FC" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="BorderBrushColor" Color="#D5DBE3" />
+      <SolidColorBrush x:Key="SubtleBorderBrush" Color="#E4E9F0" />
+      <SolidColorBrush x:Key="TextBrush" Color="#1B2129" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#66707D" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#5B45DC" />
+      <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="GutterBrush" Color="#EDF1F6" />
+      <SolidColorBrush x:Key="LineNumberBrush" Color="#93A0B0" />
+
+      <SolidColorBrush x:Key="AddedBrush" Color="#DFF6E7" />
+      <SolidColorBrush x:Key="AddedStrongBrush" Color="#9BE3B8" />
+      <SolidColorBrush x:Key="AddedAccentBrush" Color="#1B7F4B" />
+      <SolidColorBrush x:Key="RemovedBrush" Color="#FBE3E7" />
+      <SolidColorBrush x:Key="RemovedStrongBrush" Color="#F3AFB8" />
+      <SolidColorBrush x:Key="RemovedAccentBrush" Color="#A62839" />
+      <SolidColorBrush x:Key="EditedBrush" Color="#FDF4DA" />
+      <SolidColorBrush x:Key="EditedAccentBrush" Color="#8A6A12" />
+      <SolidColorBrush x:Key="MovedBrush" Color="#EAE7FC" />
+      <SolidColorBrush x:Key="MovedAccentBrush" Color="#5040B8" />
+      <SolidColorBrush x:Key="ConflictBrush" Color="#FDE7DA" />
+      <SolidColorBrush x:Key="ConflictAccentBrush" Color="#B75418" />
+      <SolidColorBrush x:Key="EmptyBrush" Color="#E7EBF1" />
+      <SolidColorBrush x:Key="SelectionBrush" Color="#D8DEF5" />
+
+      <SolidColorBrush x:Key="SyntaxKeywordBrush" Color="#7A3EA8" />
+      <SolidColorBrush x:Key="SyntaxStringBrush" Color="#2E7A3E" />
+      <SolidColorBrush x:Key="SyntaxCommentBrush" Color="#8A94A2" />
+      <SolidColorBrush x:Key="SyntaxNumberBrush" Color="#B3541E" />
+      <SolidColorBrush x:Key="SyntaxOperatorBrush" Color="#1D6C8C" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+
+  <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,DejaVu Sans Mono,Menlo,monospace</FontFamily>
+</ResourceDictionary>

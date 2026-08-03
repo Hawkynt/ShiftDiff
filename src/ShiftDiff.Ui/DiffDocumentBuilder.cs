@@ -31,6 +31,8 @@ public static class DiffDocumentBuilder
             rows.Add(BuildRow(change, syntax, blockId));
         }
 
+        SpreadMovedFlagAcrossRuns(rows, syntax);
+
         var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 2) : rows;
         var movedBlocks = BuildMovedBlockInfos(blocks, collapsed);
         var summary = Summarize(comparison.Changes, blocks.Length, 0);
@@ -171,20 +173,59 @@ public static class DiffDocumentBuilder
             rows, [$"{document.PaneTitles[0]} → {document.PaneTitles[1]}"], document.Summary, document.MovedBlocks, document.Language);
     }
 
+    // A relocated method usually matches only on its distinctive lines — braces
+    // and blank lines are never anchors (AnchorDetector). Displaying half a
+    // method as "moved" and the other half as "added" is worse than useless, so
+    // one contiguous run of adds (or removes) inherits the move flag as a whole.
+    // The reported block ranges in the inspector stay exactly what the engine
+    // found.
+    private static void SpreadMovedFlagAcrossRuns(List<DiffRow> rows, SourceLanguage syntax)
+    {
+        var index = 0;
+        while (index < rows.Count)
+        {
+            var type = rows[index].ChangeType;
+            if (type is not (ChangeType.Added or ChangeType.Removed))
+            {
+                index++;
+                continue;
+            }
+
+            var start = index;
+            while (index < rows.Count && rows[index].ChangeType == type) index++;
+
+            var blockId = rows.Skip(start).Take(index - start)
+                .FirstOrDefault(row => row.MovedBlockId is not null)?.MovedBlockId;
+            if (blockId is null) continue;
+
+            for (var i = start; i < index; i++)
+            {
+                if (rows[i].IsMoved) continue;
+
+                var cellIndex = type == ChangeType.Added ? 1 : 0;
+                var cells = rows[i].Cells.ToArray();
+                cells[cellIndex] = cells[cellIndex] with { State = CellState.Moved };
+                rows[i] = rows[i] with { IsMoved = true, MovedBlockId = blockId, Cells = cells };
+            }
+        }
+    }
+
     private static DiffRow BuildRow(LineChange change, SourceLanguage syntax, int? blockId)
     {
         var moved = blockId is not null;
 
         return change.ChangeType switch
         {
+            // The cell background already says "this whole line is new"; strong
+            // per-token highlighting is reserved for edits inside a shared line.
             ChangeType.Added => new DiffRow(
                 DiffRowKind.Line, ChangeType.Added,
-                [DiffCell.Empty, Cell(change.NewLine, change.NewIndex, CellState.Added, syntax, DiffSegmentKind.Added)],
+                [DiffCell.Empty, Cell(change.NewLine, change.NewIndex, moved ? CellState.Moved : CellState.Added, syntax)],
                 moved, MovedBlockId: blockId, OldIndex: change.OldIndex, NewIndex: change.NewIndex),
 
             ChangeType.Removed => new DiffRow(
                 DiffRowKind.Line, ChangeType.Removed,
-                [Cell(change.OldLine, change.OldIndex, CellState.Removed, syntax, DiffSegmentKind.Removed), DiffCell.Empty],
+                [Cell(change.OldLine, change.OldIndex, moved ? CellState.Moved : CellState.Removed, syntax), DiffCell.Empty],
                 moved, MovedBlockId: blockId, OldIndex: change.OldIndex, NewIndex: change.NewIndex),
 
             ChangeType.Edited => new DiffRow(
@@ -193,11 +234,11 @@ public static class DiffDocumentBuilder
                     new DiffCell(
                         change.OldIndex + 1,
                         DiffSegmentBuilder.Build(change.OldLine, change.TokenChanges, true, syntax),
-                        CellState.Edited),
+                        moved ? CellState.MovedEdited : CellState.Edited),
                     new DiffCell(
                         change.NewIndex + 1,
                         DiffSegmentBuilder.Build(change.NewLine, change.TokenChanges, false, syntax),
-                        CellState.Edited),
+                        moved ? CellState.MovedEdited : CellState.Edited),
                 ],
                 moved, MovedBlockId: blockId, OldIndex: change.OldIndex, NewIndex: change.NewIndex),
 

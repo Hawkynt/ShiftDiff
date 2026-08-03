@@ -34,7 +34,24 @@ public enum DiffRowKind
 }
 
 /// <summary>A run of characters with both its diff state and its syntax class.</summary>
-public sealed record DiffSegment(string Text, DiffSegmentKind Kind, SourceTokenKind Syntax = SourceTokenKind.Identifier);
+// The Is* properties exist so a view can switch style classes per run without a
+// converter for every combination.
+public sealed record DiffSegment(string Text, DiffSegmentKind Kind, SourceTokenKind Syntax = SourceTokenKind.Identifier)
+{
+    public bool IsAdded => Kind == DiffSegmentKind.Added;
+
+    public bool IsRemoved => Kind == DiffSegmentKind.Removed;
+
+    public bool IsKeyword => Syntax == SourceTokenKind.Keyword;
+
+    public bool IsString => Syntax == SourceTokenKind.String;
+
+    public bool IsComment => Syntax == SourceTokenKind.Comment;
+
+    public bool IsNumber => Syntax == SourceTokenKind.Number;
+
+    public bool IsOperator => Syntax is SourceTokenKind.Operator or SourceTokenKind.Punctuation;
+}
 
 public sealed record DiffCell(int? LineNumber, IReadOnlyList<DiffSegment> Segments, CellState State)
 {
@@ -43,6 +60,18 @@ public sealed record DiffCell(int? LineNumber, IReadOnlyList<DiffSegment> Segmen
     public string Text => string.Concat(Segments.Select(segment => segment.Text));
 
     public string LineNumberText => LineNumber is { } number ? number.ToString() : string.Empty;
+
+    public bool IsEmpty => State == CellState.Empty;
+
+    public bool IsAdded => State == CellState.Added;
+
+    public bool IsRemoved => State == CellState.Removed;
+
+    public bool IsEdited => State == CellState.Edited;
+
+    public bool IsMoved => State is CellState.Moved or CellState.MovedEdited;
+
+    public bool IsConflict => State == CellState.Conflict;
 }
 
 /// <summary>One displayed row across every pane of the current layout.</summary>
@@ -60,15 +89,33 @@ public sealed record DiffRow(
 
     public bool IsConflict => ChangeType == ChangeType.Conflict;
 
-    public ChangeType DisplayChangeType => IsMoved && ChangeType == ChangeType.Unchanged ? ChangeType.Moved : ChangeType;
+    // A line that belongs to a relocated block reads as "moved" whichever side it
+    // is on: showing it as a plain add/remove pair is exactly what this tool exists
+    // to avoid.
+    public ChangeType DisplayChangeType => IsMoved
+        ? ChangeType == ChangeType.Edited ? ChangeType.MovedEdited : ChangeType.Moved
+        : ChangeType;
 
-    public string Marker => ChangeMarker.Text(DisplayChangeType);
+    // Unchanged lines carry no marker — a gutter full of ticks is noise.
+    public string Marker => IsChanged ? ChangeMarker.Text(DisplayChangeType) : string.Empty;
 
-    public string EmojiMarker => ChangeMarker.Emoji(DisplayChangeType);
+    public string EmojiMarker => IsChanged ? ChangeMarker.Emoji(DisplayChangeType) : string.Empty;
 
     public string Label => Kind == DiffRowKind.Collapsed
         ? $"{HiddenLineCount} unchanged line(s)"
         : ChangeMarker.Label(DisplayChangeType);
+
+    public bool IsCollapsed => Kind == DiffRowKind.Collapsed;
+
+    public bool IsLine => Kind == DiffRowKind.Line;
+
+    public bool IsAdded => ChangeType == ChangeType.Added;
+
+    public bool IsRemoved => ChangeType == ChangeType.Removed;
+
+    public bool IsEdited => ChangeType == ChangeType.Edited;
+
+    public string CollapsedText => $"⋯  {HiddenLineCount} unchanged lines  ⋯";
 }
 
 /// <summary>A moved block plus the row indices where each of its ends is shown (FR-045 jump-to-pair).</summary>

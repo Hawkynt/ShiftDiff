@@ -22,6 +22,7 @@ public sealed class ShellViewModel : ObservableObject
     private string? _oldTitle;
     private string? _newTitle;
     private bool _isBusy;
+    private bool _showFileList;
     private int _selectedRow = -1;
 
     public ShellViewModel(ComparisonSettings? settings = null)
@@ -94,6 +95,13 @@ public sealed class ShellViewModel : ObservableObject
     {
         get => _isBusy;
         private set => SetProperty(ref _isBusy, value);
+    }
+
+    /// <summary>True for folder and repository sessions, where picking a file is part of the workflow.</summary>
+    public bool ShowFileList
+    {
+        get => _showFileList;
+        private set => SetProperty(ref _showFileList, value);
     }
 
     public string? OldTitle
@@ -222,6 +230,7 @@ public sealed class ShellViewModel : ObservableObject
         Settings.Layout = PaneLayout.ThreeWay;
         SessionTitle = $"{Path.GetFileName(localPath)} ↔ {Path.GetFileName(remotePath)}";
         _source = null;
+        ShowFileList = false;
         FileCollection.Clear();
     }
 
@@ -243,6 +252,7 @@ public sealed class ShellViewModel : ObservableObject
         Settings.Layout = PaneLayout.FourWay;
         SessionTitle = $"4-way: {Path.GetFileName(targetPath)}";
         _source = null;
+        ShowFileList = false;
         FileCollection.Clear();
     }
 
@@ -254,6 +264,7 @@ public sealed class ShellViewModel : ObservableObject
     public async Task OpenAsync(IComparisonSource source)
     {
         _source = source;
+        ShowFileList = source is not FilePairSource;
         SessionTitle = source.Title;
         FileCollection.Clear();
         foreach (var entry in source.Entries) FileCollection.Add(entry);
