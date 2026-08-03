@@ -32,6 +32,12 @@ jobs:
           dotnet-version: '10.0.x'
           include-prerelease: true
 
+      # The headless Avalonia tests render real frames through Skia, which needs
+      # fontconfig on the Linux runner.
+      - name: Install rendering dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libfontconfig1
+
       - name: Restore
         run: dotnet restore ShiftDiff.slnx
 
@@ -40,9 +46,9 @@ jobs:
 
       - name: Test
         run: >
-          dotnet test tests/ShiftDiff.Core.Tests
+          dotnet test ShiftDiff.slnx
           --configuration Release --no-build
-          --logger "trx;LogFileName=core-tests.trx"
+          --logger "trx;LogFileName=tests.trx"
 
       # Failures surface as check-run annotations so they are diagnosable
       # from the run summary without downloading artifacts.
