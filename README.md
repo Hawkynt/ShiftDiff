@@ -27,6 +27,24 @@ what happened to it on the way" instead of just "what lines differ."
 
 Full spec (goals, use cases, UI, roadmap): [SPEC.md](SPEC.md).
 
+## Desktop showcase
+
+The same three-folder comparison is captured from the real Avalonia application
+in CI. The upper workspace aligns moved files and folders; the lower workspace
+shows moved/edited blocks and the block-editable merge target.
+
+### Dark theme
+
+[![ShiftDiff three-pane folder and source comparison in dark theme](docs/screenshots/workspace-dark.png)](docs/screenshots/workspace-dark.png)
+
+### Light theme
+
+[![ShiftDiff three-pane folder and source comparison in light theme](docs/screenshots/workspace-light.png)](docs/screenshots/workspace-light.png)
+
+The deterministic inputs live in [`docs/showcase`](docs/showcase), and
+[`scripts/capture-showcase.sh`](scripts/capture-showcase.sh) regenerates both
+screenshots through the UI Showcase workflow.
+
 ## Example
 
 ![shiftdiff comparing two files, one method reordered and edited](docs/example.png)
@@ -93,21 +111,23 @@ and apply a unified diff patch to a source file — but it calls the plain line
 differ directly, not the semantic engine, so it doesn't yet surface moved
 blocks or confidence levels (see the Example above).
 
-The **desktop UI** (`ShiftDiff.App`) now provides a two-pane source comparison workflow,
-drag-and-drop/open-file loading, change navigation, moved-block details, comparison
-settings, and dark/light themes. Source files are detected and tokenized using
+The **desktop UI** (`ShiftDiff.App`) now provides a two-to-four-pane file and folder
+workspace, drag-and-drop/open loading, move relationship lines, change navigation,
+interactive block insertion/replacement, undo, safe export, and direct
+light/system/dark theme controls. Source files are detected and tokenized using
 language profiles for C#, JavaScript/TypeScript, Java, C/C++, Python, Go, Rust,
 PHP, Perl, Ruby, Visual Basic, HTML, CSS, and SQL.
 
-**Not built yet:** direct Git/SVN repository integration and the full three/four-pane
-merge UI. See SPEC.md §8.4/§12 for the planned CLI surface and §17 for MVP scope.
+**Not built yet:** direct Git/SVN repository integration and a fully editable
+character-level merge target. See SPEC.md §8.4/§12 for the planned CLI surface
+and §17 for MVP scope.
 
 ## Layout
 
 - `src/ShiftDiff.Core` — diff engine (hashing, anchor detection, block
   matching, patch parsing/application). No UI or VCS dependencies.
 - `src/ShiftDiff.Cli` — command-line entry point (two-way/three-way compare, patch apply).
-- `src/ShiftDiff.App` — Avalonia desktop UI for source-aware two-way comparison.
+- `src/ShiftDiff.App` — Avalonia desktop UI for two-to-four-pane file/folder comparison and block merging.
 - `tests/ShiftDiff.Core.Tests` — xunit tests for the core engine.
 - `tests/ShiftDiff.Cli.Tests` — xunit tests for the CLI.
 
@@ -120,7 +140,7 @@ The VCS-integration project remains planned.
 ```
 dotnet build
 dotnet test
-dotnet run --project src/ShiftDiff.App -- old.cs new.cs
+dotnet run --project src/ShiftDiff.App -- path-a path-b [path-c] [path-d]
 ```
 
 ## Workflow
