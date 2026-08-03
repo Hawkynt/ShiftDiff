@@ -3,98 +3,166 @@ using Xunit;
 
 namespace ShiftDiff.Cli.Tests;
 
-public class CliRunnerThreeWayModeTests
+public class CliRunnerThreeWayModeTests : IDisposable
 {
+    private readonly TempWorkspace _workspace = new();
+    private readonly StringWriter _output = new();
+    private readonly StringWriter _error = new();
+
+    public void Dispose() => _workspace.Dispose();
+
+    private string Out => _output.ToString();
+
+    private string Err => _error.ToString();
+
+    private int Run(params string[] args) => CliRunner.Run(args, _output, _error);
+
     [Fact]
-    public void Run_ThreeWayMode_NoConflicts_MergesCleanlyWithZeroExit()
+    public void Compare3_NoConflicts_MergesCleanlyAndReportsDifferences()
     {
-        var basePath = WriteTempFile("one\ntwo\nthree\n");
-        var localPath = WriteTempFile("one\nTWO\nthree\n");
-        var remotePath = WriteTempFile("one\ntwo\nthree\n");
-        var output = new StringWriter();
-        var error = new StringWriter();
+        var basePath = _workspace.File("one\ntwo\nthree\n");
+        var localPath = _workspace.File("one\nTWO\nthree\n");
+        var remotePath = _workspace.File("one\ntwo\nthree\n");
 
-        var exitCode = CliRunner.Run(new[] { basePath, localPath, remotePath }, output, error);
+        var exitCode = Run(basePath, localPath, remotePath);
 
-        Assert.Equal(0, exitCode);
-        Assert.Equal(
-            $"one{Environment.NewLine}TWO{Environment.NewLine}three{Environment.NewLine}",
-            output.ToString());
-        Assert.DoesNotContain("<<<<<<<", output.ToString());
-        Assert.Equal(string.Empty, error.ToString());
+        Assert.Equal(ExitCode.DifferencesFound, exitCode);
+        Assert.Equal($"one{Environment.NewLine}TWO{Environment.NewLine}three{Environment.NewLine}", Out);
+        Assert.DoesNotContain("<<<<<<<", Out);
+        Assert.Equal(string.Empty, Err);
     }
 
     [Fact]
-    public void Run_ThreeWayMode_WithConflict_EmitsGitStyleMarkersAndNonZeroExit()
+    public void Compare3_IdenticalSides_ExitsWithNoDifferences()
     {
-        var basePath = WriteTempFile("one\ntwo\nthree\n");
-        var localPath = WriteTempFile("one\nTWO-local\nthree\n");
-        var remotePath = WriteTempFile("one\ntwo-remote\nthree\n");
-        var output = new StringWriter();
-        var error = new StringWriter();
+        var basePath = _workspace.File("one\ntwo\n");
+        var localPath = _workspace.File("one\ntwo\n");
+        var remotePath = _workspace.File("one\ntwo\n");
 
-        var exitCode = CliRunner.Run(new[] { basePath, localPath, remotePath }, output, error);
-
-        Assert.NotEqual(0, exitCode);
-        var text = output.ToString();
-        Assert.Contains("<<<<<<< local", text);
-        Assert.Contains("TWO-local", text);
-        Assert.Contains("=======", text);
-        Assert.Contains("two-remote", text);
-        Assert.Contains(">>>>>>> remote", text);
-        Assert.Contains("1 conflict", error.ToString());
+        Assert.Equal(ExitCode.NoDifferences, Run("compare3", basePath, localPath, remotePath));
     }
 
     [Fact]
-    public void Run_ThreeWayMode_ConsecutiveConflictLines_GroupedIntoOneMarkerBlock()
+    public void Compare3_WithConflict_EmitsGitStyleMarkersAndExitsWithConflictCode()
     {
-        var basePath = WriteTempFile("a\nb\nc\nd\n");
-        var localPath = WriteTempFile("a\nB-local\nC-local\nd\n");
-        var remotePath = WriteTempFile("a\nB-remote\nC-remote\nd\n");
-        var output = new StringWriter();
-        var error = new StringWriter();
+        var basePath = _workspace.File("one\ntwo\nthree\n");
+        var localPath = _workspace.File("one\nTWO-local\nthree\n");
+        var remotePath = _workspace.File("one\ntwo-remote\nthree\n");
 
-        var exitCode = CliRunner.Run(new[] { basePath, localPath, remotePath }, output, error);
+        var exitCode = Run(basePath, localPath, remotePath);
 
-        Assert.NotEqual(0, exitCode);
-        var text = output.ToString();
-        Assert.Equal(1, CountOccurrences(text, "<<<<<<< local"));
-        Assert.Equal(1, CountOccurrences(text, ">>>>>>> remote"));
-        Assert.Contains($"B-local{Environment.NewLine}C-local{Environment.NewLine}=======", text);
-        Assert.Contains($"B-remote{Environment.NewLine}C-remote{Environment.NewLine}>>>>>>> remote", text);
+        Assert.Equal(ExitCode.Conflicts, exitCode);
+        Assert.Contains("<<<<<<< local", Out);
+        Assert.Contains("TWO-local", Out);
+        Assert.Contains("=======", Out);
+        Assert.Contains("two-remote", Out);
+        Assert.Contains(">>>>>>> remote", Out);
+        Assert.Contains("1 conflict", Err);
     }
 
     [Fact]
-    public void Run_ThreeWayMode_BothSidesDeleteSameLine_DropsLineFromResolvedOutputWithZeroExit()
+    public void Compare3_ConsecutiveConflictLines_GroupedIntoOneMarkerBlock()
     {
-        var basePath = WriteTempFile("a\nb\nc\n");
-        var localPath = WriteTempFile("a\nc\n");
-        var remotePath = WriteTempFile("a\nc\n");
-        var output = new StringWriter();
-        var error = new StringWriter();
+        var basePath = _workspace.File("a\nb\nc\nd\n");
+        var localPath = _workspace.File("a\nB-local\nC-local\nd\n");
+        var remotePath = _workspace.File("a\nB-remote\nC-remote\nd\n");
 
-        var exitCode = CliRunner.Run(new[] { basePath, localPath, remotePath }, output, error);
+        var exitCode = Run(basePath, localPath, remotePath);
 
-        Assert.Equal(0, exitCode);
-        Assert.Equal($"a{Environment.NewLine}c{Environment.NewLine}", output.ToString());
-        Assert.Equal(string.Empty, error.ToString());
+        Assert.Equal(ExitCode.Conflicts, exitCode);
+        Assert.Equal(1, CountOccurrences(Out, "<<<<<<< local"));
+        Assert.Equal(1, CountOccurrences(Out, ">>>>>>> remote"));
+        Assert.Contains($"B-local{Environment.NewLine}C-local{Environment.NewLine}=======", Out);
+        Assert.Contains($"B-remote{Environment.NewLine}C-remote{Environment.NewLine}>>>>>>> remote", Out);
     }
 
     [Fact]
-    public void Run_ThreeWayMode_MissingFile_ReturnsNonZeroWithFriendlyError()
+    public void Compare3_BothSidesDeleteSameLine_DropsLineFromResolvedOutput()
     {
-        var localPath = WriteTempFile("one\n");
-        var remotePath = WriteTempFile("one\n");
-        var missingBasePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
-        var output = new StringWriter();
-        var error = new StringWriter();
+        var basePath = _workspace.File("a\nb\nc\n");
+        var localPath = _workspace.File("a\nc\n");
+        var remotePath = _workspace.File("a\nc\n");
 
-        var exitCode = CliRunner.Run(new[] { missingBasePath, localPath, remotePath }, output, error);
+        var exitCode = Run(basePath, localPath, remotePath);
 
-        Assert.NotEqual(0, exitCode);
-        Assert.Contains(missingBasePath, error.ToString());
-        Assert.DoesNotContain("StackTrace", error.ToString());
-        Assert.Equal(string.Empty, output.ToString());
+        Assert.Equal(ExitCode.DifferencesFound, exitCode);
+        Assert.Equal($"a{Environment.NewLine}c{Environment.NewLine}", Out);
+        Assert.Equal(string.Empty, Err);
+    }
+
+    [Fact]
+    public void Compare3_JsonFormat_ReportsConflictCountAndMergedLines()
+    {
+        var basePath = _workspace.File("one\ntwo\n");
+        var localPath = _workspace.File("one\nTWO-local\n");
+        var remotePath = _workspace.File("one\ntwo-remote\n");
+
+        var exitCode = Run("compare3", basePath, localPath, remotePath, "--json");
+
+        Assert.Equal(ExitCode.Conflicts, exitCode);
+        using var document = System.Text.Json.JsonDocument.Parse(Out);
+        Assert.Equal(1, document.RootElement.GetProperty("conflicts").GetInt32());
+        Assert.NotEmpty(document.RootElement.GetProperty("merged").EnumerateArray());
+    }
+
+    [Fact]
+    public void Compare3_MissingFile_ExitsWithInvalidInput()
+    {
+        var localPath = _workspace.File("one\n");
+        var remotePath = _workspace.File("one\n");
+        var missingBasePath = _workspace.MissingPath();
+
+        var exitCode = Run(missingBasePath, localPath, remotePath);
+
+        Assert.Equal(ExitCode.InvalidInput, exitCode);
+        Assert.Contains(missingBasePath, Err);
+        Assert.DoesNotContain("StackTrace", Err);
+        Assert.Equal(string.Empty, Out);
+    }
+
+    // AC-003 / FR-023: the fourth file is the candidate reconstruction that gets
+    // validated against the merge of the first three.
+    [Fact]
+    public void Compare4_TargetMatchesTheMergeResult_ExitsWithNoDifferences()
+    {
+        var basePath = _workspace.File("one\ntwo\nthree\n");
+        var localPath = _workspace.File("one\nTWO\nthree\n");
+        var remotePath = _workspace.File("one\ntwo\nthree\n");
+        var targetPath = _workspace.File("one\nTWO\nthree\n");
+
+        var exitCode = Run(basePath, localPath, remotePath, targetPath);
+
+        Assert.Equal(ExitCode.NoDifferences, exitCode);
+        Assert.Contains("target matches", Out);
+    }
+
+    [Fact]
+    public void Compare4_TargetDiffersFromTheMergeResult_ReportsTheDiscrepancies()
+    {
+        var basePath = _workspace.File("one\ntwo\nthree\n");
+        var localPath = _workspace.File("one\nTWO\nthree\n");
+        var remotePath = _workspace.File("one\ntwo\nthree\n");
+        var targetPath = _workspace.File("one\nsomething-else\nthree\n");
+
+        var exitCode = Run(basePath, localPath, remotePath, targetPath);
+
+        Assert.Equal(ExitCode.DifferencesFound, exitCode);
+        Assert.Contains("target differs", Out);
+        Assert.Contains("something-else", Out);
+    }
+
+    [Fact]
+    public void Compare4_WithConflictingSides_ExitsWithConflictCode()
+    {
+        var basePath = _workspace.File("one\ntwo\n");
+        var localPath = _workspace.File("one\nTWO-local\n");
+        var remotePath = _workspace.File("one\ntwo-remote\n");
+        var targetPath = _workspace.File("one\nresolved\n");
+
+        var exitCode = Run("compare4", basePath, localPath, remotePath, targetPath);
+
+        Assert.Equal(ExitCode.Conflicts, exitCode);
+        Assert.Contains("conflict", Err);
     }
 
     private static int CountOccurrences(string text, string substring)
@@ -108,12 +176,5 @@ public class CliRunnerThreeWayModeTests
         }
 
         return count;
-    }
-
-    private static string WriteTempFile(string content)
-    {
-        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
-        File.WriteAllText(path, content);
-        return path;
     }
 }
