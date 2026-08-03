@@ -90,7 +90,8 @@ shiftdiff svn status|diff|log [rev [rev]]           compare against SVN
 Options: `--format semantic|unified|git|svn|json`, `--json`, `--mode
 strict|balanced|aggressive`, `--patch-mode exact|fuzzy|semantic`,
 `--ignore-case`, `--ignore-whitespace`, `--context <n>`, `--emoji`/`--no-emoji`,
-`--out <file>`, `--force`.
+`--out <file>`, `--force`. `--format git` writes a real git patch (`diff --git`
+headers, new/deleted file modes), `--format svn` an SVN-compatible one.
 
 Exit codes: `0` no differences, `1` differences, `2` conflicts, `3` invalid
 input, `4` internal error.
@@ -166,8 +167,9 @@ The **desktop UI** (`ShiftDiff.App`) is an Avalonia shell over that layer:
 synchronized panes for two to four sources, intra-line token colouring, syntax
 highlighting, folded unchanged regions, an overview bar, a file-list sidebar,
 a change inspector, moved-block navigation, search and change-type filters,
-block-level merging with undo and guarded export, and light/dark/system themes
-with switchable emoji markers.
+block-level merging with undo and guarded export, revision-range comparison for
+an open repository, word wrap, text zoom, a high-contrast mode, and
+light/dark/system themes with switchable emoji markers.
 
 **Not built yet:** staging and unstaging hunks, an SVN revision browser, a fully
 editable character-level merge target, and AST-assisted matching. See SPEC.md

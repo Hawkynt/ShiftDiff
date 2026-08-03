@@ -158,6 +158,25 @@ public class MainWindowTests : IDisposable
         Assert.True(frame!.Size.Width > 100);
     }
 
+    // AC-009: the window has to come up on a large file pair without freezing.
+    [AvaloniaFact]
+    public void LargeFilePair_RendersWithoutBlockingTheWindow()
+    {
+        var body = string.Join('\n', Enumerable.Range(0, 20_000).Select(i => $"line {i} of the generated file"));
+        var oldPath = Write("big.old.txt", body);
+        var newPath = Write("big.new.txt", body.Replace("line 10000 of", "CHANGED of"));
+
+        var window = Show(oldPath, newPath);
+        PumpUntil(() => window.FindControl<ListBox>("DiffList")!.ItemCount > 0);
+
+        var list = window.FindControl<ListBox>("DiffList")!;
+        Assert.True(list.ItemCount > 0);
+
+        // Folding keeps the row count near the change, not near the file size.
+        Assert.True(list.ItemCount < 100, $"{list.ItemCount} rows were materialised");
+        Assert.Contains("1 edited", window.FindControl<TextBlock>("SummaryText")!.Text ?? string.Empty);
+    }
+
     private MainWindow Show(params string[] args)
     {
         var window = new MainWindow(args);

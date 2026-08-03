@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -44,6 +45,9 @@ public sealed partial class MainWindow : Window
         JumpToPairCommand = new RelayCommand(_shell.GoToPairedBlock);
         RefreshCommand = new RelayCommand(() => _ = _shell.RefreshAsync());
         FocusSearchCommand = new RelayCommand(() => SearchBox.Focus());
+        SwapCommand = new RelayCommand(() => _ = SwapAsync());
+        ZoomInCommand = new RelayCommand(() => Zoom(1));
+        ZoomOutCommand = new RelayCommand(() => Zoom(-1));
 
         DiffList.ItemsSource = _rows;
         FileList.ItemsSource = _files;
@@ -82,6 +86,12 @@ public sealed partial class MainWindow : Window
 
     public ICommand FocusSearchCommand { get; }
 
+    public ICommand SwapCommand { get; }
+
+    public ICommand ZoomInCommand { get; }
+
+    public ICommand ZoomOutCommand { get; }
+
     /// <summary>Bound by the row template to pick between emoji and text markers (FR-043).</summary>
     public bool UseEmojiMarkers
     {
@@ -110,7 +120,32 @@ public sealed partial class MainWindow : Window
         IgnoreCaseCheck.IsChecked = _shell.Settings.IgnoreCase;
         SidebarCheck.IsChecked = true;
         InspectorCheck.IsChecked = true;
+        WrapCheck.IsChecked = _shell.Settings.WordWrap;
+        ContrastCheck.IsChecked = _shell.Settings.HighContrast;
         UseEmojiMarkers = _shell.Settings.ShowEmojiMarkers;
+        ApplyTextSettings();
+    }
+
+    // The settings that only change how the panes are drawn are applied here
+    // rather than by rebuilding the document.
+    private void ApplyTextSettings()
+    {
+        DiffList.FontSize = _shell.Settings.FontSize;
+
+        // A WrapPanel only wraps when the row is width-constrained, so switching
+        // the horizontal scrollbar off is what turns wrapping on.
+        ScrollViewer.SetHorizontalScrollBarVisibility(
+            DiffList,
+            _shell.Settings.WordWrap ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto);
+
+        Classes.Set("highcontrast", _shell.Settings.HighContrast);
+        ZoomText.Text = $"{_shell.Settings.FontSize:N0} px";
+    }
+
+    private void Zoom(int steps)
+    {
+        _shell.Settings.FontSize += steps;
+        ApplyTextSettings();
     }
 
     private void HookScrollViewer()
@@ -235,6 +270,11 @@ public sealed partial class MainWindow : Window
             case nameof(ShellViewModel.MergedLineCount):
                 UpdateMergeState();
                 break;
+            case nameof(ShellViewModel.IsRepositorySession):
+            case nameof(ShellViewModel.FromRevision):
+            case nameof(ShellViewModel.ToRevision):
+                UpdateRepositoryBar();
+                break;
         }
     }
 
@@ -255,7 +295,13 @@ public sealed partial class MainWindow : Window
         foreach (var block in _shell.MovedBlocks) _movedBlocks.Add(block);
     }
 
-    private void UpdatePaneHeaders() => PaneHeaders.ItemsSource = _shell.PaneTitles;
+    private void UpdatePaneHeaders()
+    {
+        PaneHeaders.ItemsSource = _shell.PaneTitles;
+
+        // The unified projection only applies to a two-pane comparison.
+        LayoutSelector.IsEnabled = _shell.PaneTitles.Count <= 2;
+    }
 
     private void UpdateDetails()
     {
@@ -310,12 +356,37 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void OnSwap(object? sender, RoutedEventArgs e)
+    private async Task SwapAsync()
     {
         if (_shell.OldTitle is not { } oldPath || _shell.NewTitle is not { } newPath) return;
-        if (!File.Exists(oldPath) || !File.Exists(newPath)) return;
+        if (!File.Exists(oldPath) || !File.Exists(newPath))
+        {
+            // Repository and workspace sides are revisions, not files on disk.
+            StatusText.Text = "Only a file pair can be swapped.";
+            return;
+        }
 
         await _shell.OpenFilePairAsync(newPath, oldPath);
+    }
+
+    // --- repository revisions (FR-030/FR-031) ------------------------------
+
+    private async void OnCompareRevisions(object? sender, RoutedEventArgs e) => await CompareRevisionsAsync();
+
+    private async void OnRevisionKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) await CompareRevisionsAsync();
+    }
+
+    private Task CompareRevisionsAsync() =>
+        _shell.OpenRevisionRangeAsync(FromRevisionBox.Text ?? string.Empty, ToRevisionBox.Text ?? string.Empty);
+
+    private void UpdateRepositoryBar()
+    {
+        RevisionBar.IsVisible = _shell.IsRepositorySession;
+        DropHintText.IsVisible = !_shell.IsRepositorySession;
+        FromRevisionBox.Text = _shell.FromRevision;
+        ToRevisionBox.Text = _shell.ToRevision;
     }
 
     private async void OnExportPatch(object? sender, RoutedEventArgs e)
@@ -434,6 +505,22 @@ public sealed partial class MainWindow : Window
         _shell.Settings.ShowEmojiMarkers = EmojiCheck.IsChecked == true;
         UseEmojiMarkers = EmojiCheck.IsChecked == true;
     }
+
+    private void OnWrapChanged(object? sender, RoutedEventArgs e)
+    {
+        _shell.Settings.WordWrap = WrapCheck.IsChecked == true;
+        ApplyTextSettings();
+    }
+
+    private void OnContrastChanged(object? sender, RoutedEventArgs e)
+    {
+        _shell.Settings.HighContrast = ContrastCheck.IsChecked == true;
+        ApplyTextSettings();
+    }
+
+    private void OnZoomIn(object? sender, RoutedEventArgs e) => Zoom(1);
+
+    private void OnZoomOut(object? sender, RoutedEventArgs e) => Zoom(-1);
 
     private void OnSidebarChanged(object? sender, RoutedEventArgs e) =>
         SidebarPanel.IsVisible = SidebarCheck.IsChecked == true && _shell.ShowFileList;

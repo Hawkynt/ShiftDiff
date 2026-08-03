@@ -39,6 +39,13 @@ viewport indicator; clicking or dragging jumps there. The toolbar and keyboard c
 previous change (F7/F8), next conflict (Shift+F8), next moved block (Ctrl+F8) and jump to the
 paired end of a moved block (Ctrl+P).
 
+## Repository sessions
+
+Opening a working copy compares HEAD (or BASE for SVN) against the working tree.
+The revision fields in the options bar compare any other range — two commits,
+two tags, a branch against the working tree — and the file list refreshes with
+whatever changed between them.
+
 ## Inspector
 
 Selecting a line explains it: change type, source and target line, and — for a block match — its
@@ -56,4 +63,6 @@ without an explicit confirmation (AC-010).
 
 Light, dark and system themes are declared as theme dictionaries, so every surface and every
 semantic colour switches together. Change markers are available as emoji or as plain text and can
-be switched at any time; no marker relies on colour or emoji alone (FR-043/FR-044).
+be switched at any time; no marker relies on colour or emoji alone (FR-043/FR-044). A
+high-contrast mode strengthens every semantic fill, text zoom is available from the options bar
+or with Ctrl+plus/minus, and long lines can be wrapped instead of scrolled.

@@ -17,6 +17,8 @@
     <KeyBinding Gesture="Ctrl+P" Command="{Binding $self.JumpToPairCommand}" />
     <KeyBinding Gesture="F5" Command="{Binding $self.RefreshCommand}" />
     <KeyBinding Gesture="Ctrl+F" Command="{Binding $self.FocusSearchCommand}" />
+    <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding $self.ZoomInCommand}" />
+    <KeyBinding Gesture="Ctrl+OemMinus" Command="{Binding $self.ZoomOutCommand}" />
   </Window.KeyBindings>
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">
@@ -41,7 +43,7 @@
           <Button Content="Open pair…" Click="OnOpenPair" ToolTip.Tip="Compare two files" />
           <Button Content="Folders…" Click="OnOpenFolders" ToolTip.Tip="Compare two folders" />
           <Button Content="Repository…" Click="OnOpenRepository" ToolTip.Tip="Open a Git or SVN working copy" />
-          <Button Content="Swap" Click="OnSwap" ToolTip.Tip="Swap the two sides" />
+          <Button x:Name="SwapButton" Content="Swap" Command="{Binding $parent[Window].SwapCommand}" ToolTip.Tip="Swap the two sides" />
         </StackPanel>
 
         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="5" VerticalAlignment="Center">
@@ -72,24 +74,47 @@
             BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="0,0,0,1"
             DragDrop.AllowDrop="True">
       <Grid ColumnDefinitions="*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <TextBlock Text="COMPARE" Classes="caption" VerticalAlignment="Center" />
-          <ComboBox x:Name="DetectionSelector" Width="120" SelectionChanged="OnDetectionChanged"
-                    ToolTip.Tip="Semantic detection aggressiveness" />
-          <ComboBox x:Name="WhitespaceSelector" Width="125" SelectionChanged="OnWhitespaceChanged"
-                    ToolTip.Tip="Whitespace handling" />
-          <CheckBox x:Name="IgnoreCaseCheck" Content="Ignore case" IsCheckedChanged="OnIgnoreCaseChanged" />
-          <Rectangle Width="1" Height="20" Fill="{DynamicResource BorderBrushColor}" />
-          <TextBlock Text="VIEW" Classes="caption" VerticalAlignment="Center" />
-          <CheckBox x:Name="CollapseCheck" Content="Fold unchanged" IsCheckedChanged="OnCollapseChanged" />
-          <CheckBox x:Name="SyntaxCheck" Content="Syntax colours" IsCheckedChanged="OnSyntaxChanged" />
-          <CheckBox x:Name="EmojiCheck" Content="Emoji markers" IsCheckedChanged="OnEmojiChanged" />
-          <CheckBox x:Name="SidebarCheck" Content="File list" IsCheckedChanged="OnSidebarChanged" />
-          <CheckBox x:Name="InspectorCheck" Content="Inspector" IsCheckedChanged="OnInspectorChanged" />
-        </StackPanel>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+            <TextBlock Text="COMPARE" Classes="caption" VerticalAlignment="Center" />
+            <ComboBox x:Name="DetectionSelector" Width="118" SelectionChanged="OnDetectionChanged"
+                      ToolTip.Tip="Semantic detection aggressiveness" />
+            <ComboBox x:Name="WhitespaceSelector" Width="118" SelectionChanged="OnWhitespaceChanged"
+                      ToolTip.Tip="Whitespace handling" />
+            <CheckBox x:Name="IgnoreCaseCheck" Content="Case" IsCheckedChanged="OnIgnoreCaseChanged"
+                      ToolTip.Tip="Ignore case differences" />
+            <Rectangle Width="1" Height="20" Fill="{DynamicResource BorderBrushColor}" />
+            <TextBlock Text="VIEW" Classes="caption" VerticalAlignment="Center" />
+            <CheckBox x:Name="CollapseCheck" Content="Fold" IsCheckedChanged="OnCollapseChanged"
+                      ToolTip.Tip="Fold unchanged regions" />
+            <CheckBox x:Name="SyntaxCheck" Content="Syntax" IsCheckedChanged="OnSyntaxChanged"
+                      ToolTip.Tip="Syntax colouring" />
+            <CheckBox x:Name="EmojiCheck" Content="Emoji" IsCheckedChanged="OnEmojiChanged"
+                      ToolTip.Tip="Emoji change markers" />
+            <CheckBox x:Name="WrapCheck" Content="Wrap" IsCheckedChanged="OnWrapChanged"
+                      ToolTip.Tip="Wrap long lines" />
+            <CheckBox x:Name="ContrastCheck" Content="Contrast" IsCheckedChanged="OnContrastChanged"
+                      ToolTip.Tip="High contrast fills" />
+            <CheckBox x:Name="SidebarCheck" Content="Files" IsCheckedChanged="OnSidebarChanged"
+                      ToolTip.Tip="File list sidebar" />
+            <CheckBox x:Name="InspectorCheck" Content="Inspector" IsCheckedChanged="OnInspectorChanged" />
+            <Button Classes="icon" Content="A-" Click="OnZoomOut" ToolTip.Tip="Smaller text (Ctrl+-)" />
+            <Button Classes="icon" Content="A+" Click="OnZoomIn" ToolTip.Tip="Larger text (Ctrl++)" />
+          </StackPanel>
+        </ScrollViewer>
 
-        <TextBlock Grid.Column="1" x:Name="DropHintText" Classes="muted" VerticalAlignment="Center"
-                   Text="Drop 1–4 files, two folders or a repository anywhere" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                    Margin="12,0,0,0">
+          <StackPanel x:Name="RevisionBar" Orientation="Horizontal" Spacing="6" IsVisible="False">
+            <TextBlock Text="REVISIONS" Classes="caption" VerticalAlignment="Center" />
+            <TextBox x:Name="FromRevisionBox" Width="110" Watermark="from" KeyUp="OnRevisionKeyUp" />
+            <TextBlock Text="→" VerticalAlignment="Center" Classes="muted" />
+            <TextBox x:Name="ToRevisionBox" Width="110" Watermark="to" KeyUp="OnRevisionKeyUp" />
+            <Button Content="Compare" Click="OnCompareRevisions" />
+          </StackPanel>
+          <TextBlock x:Name="DropHintText" Classes="muted" VerticalAlignment="Center"
+                     Text="Drop 1–4 files, folders or a repository" />
+        </StackPanel>
       </Grid>
     </Border>
 
@@ -209,7 +234,7 @@
                           <ItemsControl Grid.Column="1" ItemsSource="{Binding Segments}" Margin="2,1,0,1">
                             <ItemsControl.ItemsPanel>
                               <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
+                                <WrapPanel Orientation="Horizontal" />
                               </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -324,13 +349,14 @@
     <!-- Status bar ===================================================== -->
     <Border Grid.Row="3" Background="{DynamicResource ChromeBrush}"
             BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="0,1,0,0" Padding="12,6">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
         <TextBlock x:Name="ChangePositionText" Text="no changes" Classes="muted" Margin="0,0,14,0" />
         <TextBlock Grid.Column="1" x:Name="StatusText" Text="Ready" Classes="muted"
                    TextTrimming="CharacterEllipsis" />
         <Button Grid.Column="2" x:Name="CancelButton" Content="Cancel" Click="OnCancel" IsVisible="False" Margin="0,0,8,0" />
         <ProgressBar Grid.Column="3" x:Name="BusyIndicator" Width="120" IsIndeterminate="True" IsVisible="False" />
-        <TextBlock Grid.Column="4" x:Name="ModeText" Text="Balanced" Classes="muted" Margin="14,0,0,0" />
+        <TextBlock Grid.Column="4" x:Name="ZoomText" Text="13 px" Classes="muted" Margin="14,0,0,0" />
+        <TextBlock Grid.Column="5" x:Name="ModeText" Text="Balanced" Classes="muted" Margin="14,0,0,0" />
       </Grid>
     </Border>
   </Grid>

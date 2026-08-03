@@ -184,6 +184,33 @@
     <Setter Property="Background" Value="{DynamicResource RemovedStrongBrush}" />
   </Style>
 
+  <!-- FR-044 high contrast: stronger fills and heavier markers for the same
+       semantics, so the meaning never depends on a subtle tint.  -->
+  <Style Selector="Window.highcontrast Border.cell.added">
+    <Setter Property="Background" Value="{DynamicResource AddedStrongBrush}" />
+  </Style>
+
+  <Style Selector="Window.highcontrast Border.cell.removed">
+    <Setter Property="Background" Value="{DynamicResource RemovedStrongBrush}" />
+  </Style>
+
+  <Style Selector="Window.highcontrast Border.cell.edited">
+    <Setter Property="Background" Value="{DynamicResource EditedAccentBrush}" />
+  </Style>
+
+  <Style Selector="Window.highcontrast Border.cell.moved">
+    <Setter Property="Background" Value="{DynamicResource MovedAccentBrush}" />
+  </Style>
+
+  <Style Selector="Window.highcontrast Border.cell.conflict">
+    <Setter Property="Background" Value="{DynamicResource ConflictAccentBrush}" />
+  </Style>
+
+  <Style Selector="Window.highcontrast TextBlock.seg">
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
   <!-- Markers  -->
   <Style Selector="TextBlock.marker">
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
