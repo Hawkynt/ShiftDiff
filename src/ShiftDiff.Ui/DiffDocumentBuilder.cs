@@ -10,15 +10,17 @@ public static class DiffDocumentBuilder
         SourceFileComparisonResult result,
         ComparisonSettings settings,
         string oldTitle = "Old",
-        string newTitle = "New") =>
-        BuildTwoWay(result.Comparison, result.Language, settings, oldTitle, newTitle);
+        string newTitle = "New",
+        IReadOnlySet<int>? expandedRegions = null) =>
+        BuildTwoWay(result.Comparison, result.Language, settings, oldTitle, newTitle, expandedRegions);
 
     public static DiffDocument BuildTwoWay(
         FileComparisonResult comparison,
         SourceLanguage language,
         ComparisonSettings settings,
         string oldTitle = "Old",
-        string newTitle = "New")
+        string newTitle = "New",
+        IReadOnlySet<int>? expandedRegions = null)
     {
         // R-001: only blocks that genuinely changed reading order are announced.
         var blocks = MoveRefiner.Refine(comparison.MovedBlocks);
@@ -33,7 +35,7 @@ public static class DiffDocumentBuilder
 
         SpreadMovedFlagAcrossRuns(rows, syntax);
 
-        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 2) : rows;
+        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 2, expandedRegions) : rows;
         var movedBlocks = BuildMovedBlockInfos(blocks, collapsed);
         var summary = Summarize(comparison.Changes, blocks.Length, 0);
 
@@ -46,10 +48,11 @@ public static class DiffDocumentBuilder
         SourceLanguage language = SourceLanguage.PlainText,
         string baseTitle = "Base",
         string localTitle = "Local",
-        string remoteTitle = "Remote")
+        string remoteTitle = "Remote",
+        IReadOnlySet<int>? expandedRegions = null)
     {
         var rows = BuildThreeWayRows(changes, settings, language);
-        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 3) : rows;
+        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 3, expandedRegions) : rows;
         var summary = SummarizeThreeWay(changes);
 
         return new DiffDocument(collapsed, [baseTitle, localTitle, remoteTitle], summary, [], language);
@@ -65,7 +68,8 @@ public static class DiffDocumentBuilder
         string baseTitle = "Base",
         string localTitle = "Local",
         string remoteTitle = "Remote",
-        string targetTitle = "Target")
+        string targetTitle = "Target",
+        IReadOnlySet<int>? expandedRegions = null)
     {
         var threeWayRows = BuildThreeWayRows(changes, settings, language);
         var rows = new List<DiffRow>(threeWayRows.Count);
@@ -96,7 +100,7 @@ public static class DiffDocumentBuilder
             rows.Add(row with { Cells = [.. row.Cells, targetCell] });
         }
 
-        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 4) : rows;
+        var collapsed = settings.CollapseUnchanged ? Collapse(rows, settings.ContextLines, 4, expandedRegions) : rows;
         var summary = SummarizeThreeWay(changes);
         return new DiffDocument(
             collapsed, [baseTitle, localTitle, remoteTitle, targetTitle], summary, [], language);
@@ -311,7 +315,8 @@ public static class DiffDocumentBuilder
 
     // Folds runs of unchanged rows that are further than `context` lines from any
     // change into a single expandable row.
-    private static IReadOnlyList<DiffRow> Collapse(IReadOnlyList<DiffRow> rows, int context, int paneCount)
+    private static IReadOnlyList<DiffRow> Collapse(
+        IReadOnlyList<DiffRow> rows, int context, int paneCount, IReadOnlySet<int>? expandedRegions = null)
     {
         if (rows.Count == 0) return rows;
 
@@ -339,8 +344,9 @@ public static class DiffDocumentBuilder
 
             var hidden = index - start;
 
-            // A one-line gap costs more to fold than to show.
-            if (hidden <= 1)
+            // A one-line gap costs more to fold than to show, and a region the
+            // user expanded by hand stays open.
+            if (hidden <= 1 || expandedRegions?.Contains(ShellViewModel.FoldedRegionKey(rows[start])) == true)
             {
                 for (var i = start; i < index; i++) result.Add(rows[i]);
                 continue;

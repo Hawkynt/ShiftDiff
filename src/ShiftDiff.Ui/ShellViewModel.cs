@@ -10,6 +10,10 @@ public sealed class ShellViewModel : ObservableObject
 {
     private readonly List<FileListEntry> _files = [];
     private CancellationTokenSource? _analysis;
+    // The current session's analysis, replayed whenever a setting changes — a
+    // three- or four-way comparison has no IComparisonSource to fall back on.
+    private Func<CancellationToken, DiffDocument>? _reanalyse;
+    private readonly HashSet<int> _expandedRegions = [];
     private IComparisonSource? _source;
     private DiffDocument _document = DiffDocument.Empty;
     private IReadOnlyList<DiffRow> _visibleRows = [];
@@ -21,6 +25,9 @@ public sealed class ShellViewModel : ObservableObject
     private string _sessionTitle = "ShiftDiff";
     private string? _oldTitle;
     private string? _newTitle;
+    private VcsWorkspace? _workspace;
+    private string _fromRevision = VcsRevisions.Head;
+    private string _toRevision = VcsRevisions.WorkingTree;
     private InteractiveMergeDocument? _merge;
     private int _mergedLineCount;
     private bool _isBusy;
@@ -138,6 +145,9 @@ public sealed class ShellViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _selectedFile, value)) return;
+
+            // Hand-expanded regions belong to the file that was open.
+            _expandedRegions.Clear();
             if (value is not null) _ = CompareSelectedFileAsync();
         }
     }
@@ -195,8 +205,53 @@ public sealed class ShellViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
-        return OpenAsync(new VcsComparisonSource(workspace, fromRevision, toRevision));
+        _workspace = workspace;
+        FromRevision = fromRevision;
+        ToRevision = toRevision;
+        Raise(nameof(IsRepositorySession));
+        return OpenRevisionRangeAsync(fromRevision, toRevision);
     }
+
+    /// <summary>FR-030/FR-031: recompare the open repository across another revision range.</summary>
+    public Task OpenRevisionRangeAsync(string fromRevision, string toRevision)
+    {
+        if (_workspace is null)
+        {
+            StatusText = "Open a repository first.";
+            return Task.CompletedTask;
+        }
+
+        FromRevision = fromRevision;
+        ToRevision = toRevision;
+
+        try
+        {
+            return OpenAsync(new VcsComparisonSource(_workspace, fromRevision, toRevision));
+        }
+        catch (VcsCommandException exception)
+        {
+            StatusText = exception.Message;
+            return Task.CompletedTask;
+        }
+    }
+
+    public bool IsRepositorySession => _workspace is not null;
+
+    public string FromRevision
+    {
+        get => _fromRevision;
+        private set => SetProperty(ref _fromRevision, value);
+    }
+
+    public string ToRevision
+    {
+        get => _toRevision;
+        private set => SetProperty(ref _toRevision, value);
+    }
+
+    /// <summary>Revision history of the open repository, newest first (FR-030).</summary>
+    public IReadOnlyList<VcsRevision> History(string? relativePath = null, int limit = 50) =>
+        _workspace is null ? [] : _workspace.Provider.GetHistory(_workspace.Root, relativePath, limit);
 
     /// <summary>FR-041: works out what was dropped and opens the matching mode (AC-008).</summary>
     public Task OpenDroppedAsync(IReadOnlyList<string> paths)
@@ -237,7 +292,8 @@ public sealed class ShellViewModel : ObservableObject
             var language = SourceLanguageDetector.Detect(localPath);
             return DiffDocumentBuilder.BuildThreeWay(
                 changes, Settings, language,
-                Path.GetFileName(basePath), Path.GetFileName(localPath), Path.GetFileName(remotePath));
+                Path.GetFileName(basePath), Path.GetFileName(localPath), Path.GetFileName(remotePath),
+                _expandedRegions);
         });
 
         Settings.Layout = PaneLayout.ThreeWay;
@@ -259,7 +315,8 @@ public sealed class ShellViewModel : ObservableObject
             return DiffDocumentBuilder.BuildFourWay(
                 changes, File.ReadAllLines(targetPath), Settings, SourceLanguageDetector.Detect(localPath),
                 Path.GetFileName(basePath), Path.GetFileName(localPath),
-                Path.GetFileName(remotePath), Path.GetFileName(targetPath));
+                Path.GetFileName(remotePath), Path.GetFileName(targetPath),
+                _expandedRegions);
         });
 
         Settings.Layout = PaneLayout.FourWay;
@@ -270,12 +327,18 @@ public sealed class ShellViewModel : ObservableObject
     }
 
     public Task OpenRepositoryOrFolderAsync(string path) =>
-        VcsWorkspace.Open(path) is { } workspace
-            ? OpenAsync(new VcsComparisonSource(workspace))
+        VcsWorkspace.Open(path) is not null
+            ? OpenRepositoryAsync(path)
             : Task.FromResult(StatusText = $"Drop a second folder to compare {Path.GetFileName(path)} against.");
 
     public async Task OpenAsync(IComparisonSource source)
     {
+        if (source is not VcsComparisonSource)
+        {
+            _workspace = null;
+            Raise(nameof(IsRepositorySession));
+        }
+
         _source = source;
         ShowFileList = source is not FilePairSource;
         SessionTitle = source.Title;
@@ -300,7 +363,11 @@ public sealed class ShellViewModel : ObservableObject
         await CompareSelectedFileAsync();
     }
 
-    public Task RefreshAsync() => _source is null || SelectedFile is null ? Task.CompletedTask : CompareSelectedFileAsync();
+    public Task RefreshAsync()
+    {
+        if (_source is not null && SelectedFile is not null) return CompareSelectedFileAsync();
+        return _reanalyse is null ? Task.CompletedTask : RunAnalysisAsync(_reanalyse);
+    }
 
     /// <summary>FR-052: abandons a running analysis.</summary>
     public void CancelAnalysis() => _analysis?.Cancel();
@@ -332,13 +399,29 @@ public sealed class ShellViewModel : ObservableObject
         SelectDocumentRow(index);
     }
 
-    /// <summary>Expands one folded region back into its individual lines.</summary>
-    public void ExpandRegion(DiffRow collapsedRow)
+    /// <summary>Expands one folded region back into its individual lines, leaving the rest folded.</summary>
+    public Task ExpandRegionAsync(DiffRow collapsedRow)
     {
-        if (collapsedRow.Kind != DiffRowKind.Collapsed) return;
+        if (collapsedRow.Kind != DiffRowKind.Collapsed) return Task.CompletedTask;
+        if (!_expandedRegions.Add(FoldedRegionKey(collapsedRow))) return Task.CompletedTask;
 
-        Settings.CollapseUnchanged = false;
+        return RefreshAsync();
     }
+
+    /// <summary>Folds every region that was expanded by hand back up again.</summary>
+    public Task CollapseAllRegionsAsync()
+    {
+        if (_expandedRegions.Count == 0) return Task.CompletedTask;
+
+        _expandedRegions.Clear();
+        return RefreshAsync();
+    }
+
+    // Keyed by the first hidden line so the choice survives a rebuild of the
+    // document. Insertions have no old index, so their new index is used with a
+    // disjoint (negative) key space.
+    internal static int FoldedRegionKey(DiffRow row) =>
+        row.OldIndex is { } oldIndex ? oldIndex : -(row.NewIndex ?? 0) - 1;
 
     // --- interactive merge (FR-047) ---------------------------------------
 
@@ -467,13 +550,15 @@ public sealed class ShellViewModel : ObservableObject
             token.ThrowIfCancellationRequested();
 
             var document = DiffDocumentBuilder.BuildTwoWay(
-                result, Settings, Path.GetFileName(input.OldTitle), Path.GetFileName(input.NewTitle));
+                result, Settings, Path.GetFileName(input.OldTitle), Path.GetFileName(input.NewTitle),
+                _expandedRegions);
             return Settings.Layout == PaneLayout.Unified ? DiffDocumentBuilder.ToUnified(document) : document;
         });
     }
 
     private async Task RunAnalysisAsync(Func<CancellationToken, DiffDocument> analyse)
     {
+        _reanalyse = analyse;
         _analysis?.Cancel();
         var cancellation = new CancellationTokenSource();
         _analysis = cancellation;

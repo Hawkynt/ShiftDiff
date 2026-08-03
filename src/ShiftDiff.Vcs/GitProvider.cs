@@ -91,9 +91,18 @@ public sealed class GitProvider(IProcessRunner? processRunner = null, string exe
         if (!result.Succeeded)
         {
             throw new VcsCommandException(
-                $"git {string.Join(' ', arguments)} failed ({result.ExitCode}): {result.StandardError.Trim()}");
+                $"git {string.Join(' ', arguments)} failed ({result.ExitCode}): {FirstLines(result.StandardError)}");
         }
 
         return result.StandardOutput;
+    }
+
+    // Tools answer an invalid invocation with a page of usage text; only the
+    // first lines say anything useful to the caller.
+    private static string FirstLines(string text, int count = 3)
+    {
+        var lines = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+        var kept = string.Join(" / ", lines.Take(count)).Trim();
+        return lines.Length > count ? kept + " …" : kept;
     }
 }

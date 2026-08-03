@@ -105,7 +105,13 @@ public static class CliRunner
 
     private static UnifiedDiffFile BuildPatch(
         CliOptions options, SourceFileComparisonResult result, string oldPath, string newPath) =>
-        UnifiedDiffBuilder.Build(result.Comparison.Changes, oldPath, newPath, options.ContextLines);
+        BuildPatch(options, result.Comparison.Changes, oldPath, newPath);
+
+    private static UnifiedDiffFile BuildPatch(
+        CliOptions options, IReadOnlyList<LineChange> changes, string oldPath, string newPath) =>
+        options.Format == OutputFormat.Git
+            ? UnifiedDiffBuilder.BuildGit(changes, oldPath, newPath, options.ContextLines)
+            : UnifiedDiffBuilder.Build(changes, oldPath, newPath, options.ContextLines);
 
     private static int RunFolderCompare(CliOptions options, string basePath, string targetPath, TextWriter output)
     {
@@ -361,7 +367,7 @@ public static class CliRunner
             File.ReadAllBytes(oldPath), File.ReadAllBytes(newPath), oldPath, newPath,
             options.IgnoreCase, options.Whitespace, options.Detection);
 
-        var file = UnifiedDiffBuilder.Build(result.Comparison.Changes, oldPath, newPath, options.ContextLines);
+        var file = BuildPatch(options, result.Comparison.Changes, oldPath, newPath);
         var lines = options.Format == OutputFormat.Svn
             ? UnifiedDiffFormatter.FormatSvn(file)
             : UnifiedDiffFormatter.Format(file);

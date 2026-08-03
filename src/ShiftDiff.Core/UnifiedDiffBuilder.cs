@@ -2,6 +2,49 @@ namespace ShiftDiff.Core;
 
 public static class UnifiedDiffBuilder
 {
+    private const string DefaultFileMode = "100644";
+
+    /// <summary>
+    /// FR-024: the same diff wrapped in git's extended header, so the result is a
+    /// patch `git apply` accepts rather than a bare unified diff.
+    /// </summary>
+    public static UnifiedDiffFile BuildGit(
+        IReadOnlyList<LineChange> changes, string oldPath, string newPath, int contextLines = 3)
+    {
+        var file = Build(changes, oldPath, newPath, contextLines);
+        var oldName = GitPath(oldPath);
+        var newName = GitPath(newPath);
+
+        // An empty file still loads as a single empty line (TextFileLoader), so
+        // "has no content" is what decides creation/deletion, not "has no lines".
+        var oldIsEmpty = IsEmptySide(changes, isOld: true);
+        var newIsEmpty = IsEmptySide(changes, isOld: false);
+        var creation = (oldIsEmpty, newIsEmpty) switch
+        {
+            (true, false) => new GitFileCreationMode(GitFileCreationKind.NewFile, DefaultFileMode),
+            (false, true) => new GitFileCreationMode(GitFileCreationKind.DeletedFile, DefaultFileMode),
+            _ => null,
+        };
+
+        var rename = oldName == newName
+            ? null
+            : new GitRenameCopyMetadata(GitRenameCopyKind.Rename, oldName, newName);
+
+        return file with
+        {
+            GitHeader = new GitExtendedHeader(
+                new GitDiffHeader(oldName, newName), null, creation, null, rename, null),
+        };
+    }
+
+    // Git paths are repo-relative and always use forward slashes.
+    private static string GitPath(string path) => path.Replace('\\', '/').TrimStart('/');
+
+    private static bool IsEmptySide(IReadOnlyList<LineChange> changes, bool isOld) =>
+        changes
+            .Where(change => (isOld ? change.OldIndex : change.NewIndex) is not null)
+            .All(change => string.IsNullOrEmpty(isOld ? change.OldLine : change.NewLine));
+
     public static UnifiedDiffFile Build(
         IReadOnlyList<LineChange> changes, string oldPath, string newPath, int contextLines = 3)
     {

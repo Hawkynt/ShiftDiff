@@ -502,9 +502,9 @@ public sealed partial class MainWindow : Window
         Overview.CursorPosition = _rows.Count == 0 ? -1 : (double)DiffList.SelectedIndex / _rows.Count;
     }
 
-    private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    private async void OnRowDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (DiffList.SelectedItem is DiffRow { Kind: DiffRowKind.Collapsed } row) _shell.ExpandRegion(row);
+        if (DiffList.SelectedItem is DiffRow { Kind: DiffRowKind.Collapsed } row) await _shell.ExpandRegionAsync(row);
     }
 
     private void OnFileSelected(object? sender, SelectionChangedEventArgs e)
