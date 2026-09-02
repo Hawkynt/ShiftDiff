@@ -14,7 +14,7 @@ on:
 # pull-request run supersedes the older one; a push to main is not cancelled, because main wants a
 # recorded result for every commit rather than only for the newest.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
+  group: showcase-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
