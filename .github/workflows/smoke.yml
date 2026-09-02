@@ -1,0 +1,21 @@
+name: Smoke
+
+# The fast tier, on every push to a working branch: one OS, fast tests only, no coverage, no
+# package-README check. It answers "is what I just pushed broken?" in minutes; ci.yml on the pull
+# request is the gate that runs both runners.
+#
+# Never on main: that branch takes changes through pull requests, which already ran the full gate.
+on:
+  push:
+    branches-ignore: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-smoke.yml@v1
+    with:
+      solution: ShiftDiff.slnx
+      dotnet-version: '10.0.x'
+      # Avalonia renders text during the tests, so the fonts have to exist before the build. This is
+      # the same pair ci.yml installs; without it the shared workflow could not be used here at all.
+      setup-command: 'sudo apt-get update && sudo apt-get install --yes libfontconfig1 fonts-dejavu-core'
