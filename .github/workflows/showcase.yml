@@ -10,6 +10,13 @@ on:
       - 'scripts/capture-showcase.sh'
       - '.github/workflows/showcase.yml'
 
+# Pushing three times to a branch used to queue three full matrices and run all of them. A newer
+# pull-request run supersedes the older one; a push to main is not cancelled, because main wants a
+# recorded result for every commit rather than only for the newest.
+concurrency:
+  group: showcase-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
