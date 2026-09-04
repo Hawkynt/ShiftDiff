@@ -1,8 +1,7 @@
 namespace ShiftDiff.Core;
 
-public enum DetectionMode
-{
-    Strict,
-    Balanced,
-    Aggressive
+public enum DetectionMode {
+  Strict,
+  Balanced,
+  Aggressive
 }

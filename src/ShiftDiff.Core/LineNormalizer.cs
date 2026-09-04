@@ -2,47 +2,39 @@ using System.Text;
 
 namespace ShiftDiff.Core;
 
-public static class LineNormalizer
-{
-    public static string Trim(string line) => line.Trim();
+public static class LineNormalizer {
+  public static string Trim(string line) => line.Trim();
 
-    public static string NormalizeWhitespace(string line)
-    {
-        var builder = new StringBuilder(line.Length);
-        var previousWasWhitespace = false;
+  public static string NormalizeWhitespace(string line) {
+    var builder = new StringBuilder(line.Length);
+    var previousWasWhitespace = false;
 
-        foreach (var character in line)
-        {
-            if (char.IsWhiteSpace(character))
-            {
-                if (!previousWasWhitespace)
-                {
-                    builder.Append(' ');
-                    previousWasWhitespace = true;
-                }
-
-                continue;
-            }
-
-            builder.Append(character);
-            previousWasWhitespace = false;
+    foreach (var character in line) {
+      if (char.IsWhiteSpace(character)) {
+        if (!previousWasWhitespace) {
+          builder.Append(' ');
+          previousWasWhitespace = true;
         }
 
-        return builder.ToString();
+        continue;
+      }
+
+      builder.Append(character);
+      previousWasWhitespace = false;
     }
 
-    public static string RemoveWhitespace(string line)
-    {
-        var builder = new StringBuilder(line.Length);
+    return builder.ToString();
+  }
 
-        foreach (var character in line)
-        {
-            if (!char.IsWhiteSpace(character))
-            {
-                builder.Append(character);
-            }
-        }
+  public static string RemoveWhitespace(string line) {
+    var builder = new StringBuilder(line.Length);
 
-        return builder.ToString();
+    foreach (var character in line) {
+      if (!char.IsWhiteSpace(character)) {
+        builder.Append(character);
+      }
     }
+
+    return builder.ToString();
+  }
 }

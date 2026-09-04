@@ -2,70 +2,62 @@ using System.Linq;
 
 namespace ShiftDiff.Core;
 
-public static class AnchorDetector
-{
-    public static int DuplicateCount(string[] lines, int index)
-    {
-        var targetHash = LineHasher.HashWhitespaceNormalized(lines[index]);
-        return lines.Count(line => LineHasher.HashWhitespaceNormalized(line) == targetHash);
+public static class AnchorDetector {
+  public static int DuplicateCount(string[] lines, int index) {
+    var targetHash = LineHasher.HashWhitespaceNormalized(lines[index]);
+    return lines.Count(line => LineHasher.HashWhitespaceNormalized(line) == targetHash);
+  }
+
+  /// <summary>
+  /// Batch form of <see cref="DuplicateCount"/> — computes every line's duplicate count in one
+  /// O(n) pass instead of the O(n) rescan per call that made repeated per-line lookups (e.g.
+  /// <see cref="BlockClassifier.Classify"/> over a candidate's whole span) effectively O(n^2).
+  /// </summary>
+  public static int[] DuplicateCounts(string[] lines) {
+    var hashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+    var counts = hashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
+
+    return hashes.Select(hash => counts[hash]).ToArray();
+  }
+
+  public static LineAnchor[] Detect(string[] lines, CancellationToken cancellationToken = default) => DetectWithDuplicateCounts(lines, cancellationToken).Anchors;
+
+  /// <summary>
+  /// Combined form of <see cref="Detect"/> and <see cref="DuplicateCounts"/> — callers that need
+  /// both (e.g. <see cref="BlockClassifier.Classify"/>) previously hashed every line twice, once
+  /// per method. This computes the hash pass exactly once and derives both results from it.
+  /// </summary>
+  public static (LineAnchor[] Anchors, int[] DuplicateCounts) DetectWithDuplicateCounts(string[] lines, CancellationToken cancellationToken = default) {
+    cancellationToken.ThrowIfCancellationRequested();
+
+    var lineHashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
+    var whitespaceNormalizedCounts = lineHashes
+        .GroupBy(hash => hash)
+        .ToDictionary(group => group.Key, group => group.Count());
+
+    var anchors = new LineAnchor[lines.Length];
+    var duplicateCounts = new int[lines.Length];
+
+    for (var index = 0; index < lines.Length; index++) {
+      cancellationToken.ThrowIfCancellationRequested();
+      anchors[index] = new LineAnchor(index, lines[index], ClassifyLine(lines[index], lineHashes[index], whitespaceNormalizedCounts));
+      duplicateCounts[index] = whitespaceNormalizedCounts[lineHashes[index]];
     }
 
-    /// <summary>
-    /// Batch form of <see cref="DuplicateCount"/> — computes every line's duplicate count in one
-    /// O(n) pass instead of the O(n) rescan per call that made repeated per-line lookups (e.g.
-    /// <see cref="BlockClassifier.Classify"/> over a candidate's whole span) effectively O(n^2).
-    /// </summary>
-    public static int[] DuplicateCounts(string[] lines)
-    {
-        var hashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
-        var counts = hashes.GroupBy(hash => hash).ToDictionary(group => group.Key, group => group.Count());
+    return (anchors, duplicateCounts);
+  }
 
-        return hashes.Select(hash => counts[hash]).ToArray();
+  private static AnchorQuality ClassifyLine(string line, string whitespaceNormalizedHash, Dictionary<string, int> whitespaceNormalizedCounts) {
+    var trimmed = line.Trim();
+
+    if (trimmed is "" or "{" or "}" or "else") {
+      return AnchorQuality.Rejected;
     }
 
-    public static LineAnchor[] Detect(string[] lines, CancellationToken cancellationToken = default) => DetectWithDuplicateCounts(lines, cancellationToken).Anchors;
-
-    /// <summary>
-    /// Combined form of <see cref="Detect"/> and <see cref="DuplicateCounts"/> — callers that need
-    /// both (e.g. <see cref="BlockClassifier.Classify"/>) previously hashed every line twice, once
-    /// per method. This computes the hash pass exactly once and derives both results from it.
-    /// </summary>
-    public static (LineAnchor[] Anchors, int[] DuplicateCounts) DetectWithDuplicateCounts(string[] lines, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var lineHashes = lines.Select(LineHasher.HashWhitespaceNormalized).ToArray();
-        var whitespaceNormalizedCounts = lineHashes
-            .GroupBy(hash => hash)
-            .ToDictionary(group => group.Key, group => group.Count());
-
-        var anchors = new LineAnchor[lines.Length];
-        var duplicateCounts = new int[lines.Length];
-
-        for (var index = 0; index < lines.Length; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            anchors[index] = new LineAnchor(index, lines[index], ClassifyLine(lines[index], lineHashes[index], whitespaceNormalizedCounts));
-            duplicateCounts[index] = whitespaceNormalizedCounts[lineHashes[index]];
-        }
-
-        return (anchors, duplicateCounts);
+    if (whitespaceNormalizedCounts[whitespaceNormalizedHash] > 1 || trimmed.Length < 8) {
+      return AnchorQuality.Weak;
     }
 
-    private static AnchorQuality ClassifyLine(string line, string whitespaceNormalizedHash, Dictionary<string, int> whitespaceNormalizedCounts)
-    {
-        var trimmed = line.Trim();
-
-        if (trimmed is "" or "{" or "}" or "else")
-        {
-            return AnchorQuality.Rejected;
-        }
-
-        if (whitespaceNormalizedCounts[whitespaceNormalizedHash] > 1 || trimmed.Length < 8)
-        {
-            return AnchorQuality.Weak;
-        }
-
-        return AnchorQuality.Strong;
-    }
+    return AnchorQuality.Strong;
+  }
 }

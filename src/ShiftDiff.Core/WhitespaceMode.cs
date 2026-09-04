@@ -1,9 +1,8 @@
 namespace ShiftDiff.Core;
 
-public enum WhitespaceMode
-{
-    None,
-    Trim,
-    Normalize,
-    RemoveAll,
+public enum WhitespaceMode {
+  None,
+  Trim,
+  Normalize,
+  RemoveAll,
 }

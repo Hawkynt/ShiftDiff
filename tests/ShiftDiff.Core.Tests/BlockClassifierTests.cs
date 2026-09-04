@@ -3,31 +3,28 @@ using Xunit;
 
 namespace ShiftDiff.Core.Tests;
 
-public class BlockClassifierTests
-{
-    [Fact]
-    public void Classify_returns_no_matches_for_no_candidates()
-    {
-        var result = BlockClassifier.Classify(
-            System.Array.Empty<BlockCandidate>(),
-            System.Array.Empty<string>(),
-            System.Array.Empty<string>());
+public class BlockClassifierTests {
+  [Fact]
+  public void Classify_returns_no_matches_for_no_candidates() {
+    var result = BlockClassifier.Classify(
+        System.Array.Empty<BlockCandidate>(),
+        System.Array.Empty<string>(),
+        System.Array.Empty<string>());
 
-        Assert.Empty(result);
-    }
+    Assert.Empty(result);
+  }
 
-    [Fact]
-    public void Classify_marks_a_single_candidate_as_moved_with_positions_copied_through()
+  [Fact]
+  public void Classify_marks_a_single_candidate_as_moved_with_positions_copied_through() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -37,63 +34,61 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
-        var match = Assert.Single(result);
-        Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875, Confidence.Certain), match);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875, Confidence.Certain), match);
+  }
 
-    [Fact]
-    public void Classify_marks_every_candidate_as_moved_and_preserves_order()
+  [Fact]
+  public void Classify_marks_every_candidate_as_moved_and_preserves_order() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "alpha line content unique zero",
             "bravo line content unique one",
             "charlie line content unique two",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "delta line content unique zero",
             "alpha line content unique zero",
             "echo line content unique two",
             "charlie line content unique two",
         };
-        var candidates = new[]
-        {
+    var candidates = new[]
+    {
             new BlockCandidate(0, 0, 1, 1),
             new BlockCandidate(2, 2, 3, 3),
         };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
-        Assert.Equal(2, result.Length);
-        Assert.Equal(0, result[0].OldStart);
-        Assert.Equal(0, result[0].OldEnd);
-        Assert.Equal(1, result[0].NewStart);
-        Assert.Equal(1, result[0].NewEnd);
-        Assert.Equal(ChangeType.Moved, result[0].MatchType);
-        Assert.Equal(2, result[1].OldStart);
-        Assert.Equal(2, result[1].OldEnd);
-        Assert.Equal(3, result[1].NewStart);
-        Assert.Equal(3, result[1].NewEnd);
-        Assert.Equal(ChangeType.Moved, result[1].MatchType);
-    }
+    Assert.Equal(2, result.Length);
+    Assert.Equal(0, result[0].OldStart);
+    Assert.Equal(0, result[0].OldEnd);
+    Assert.Equal(1, result[0].NewStart);
+    Assert.Equal(1, result[0].NewEnd);
+    Assert.Equal(ChangeType.Moved, result[0].MatchType);
+    Assert.Equal(2, result[1].OldStart);
+    Assert.Equal(2, result[1].OldEnd);
+    Assert.Equal(3, result[1].NewStart);
+    Assert.Equal(3, result[1].NewEnd);
+    Assert.Equal(ChangeType.Moved, result[1].MatchType);
+  }
 
-    [Fact]
-    public void Classify_composes_with_BlockBuilder_output_for_a_contiguous_moved_block()
+  [Fact]
+  public void Classify_composes_with_BlockBuilder_output_for_a_contiguous_moved_block() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -104,53 +99,51 @@ public class BlockClassifierTests
             "block line Gamma long enough content",
         };
 
-        var candidates = BlockBuilder.Build(oldLines, newLines);
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+    var candidates = BlockBuilder.Build(oldLines, newLines);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
-        var match = Assert.Single(result);
-        Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875, Confidence.Certain), match);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(new BlockMatch(1, 3, 5, 7, ChangeType.Moved, 0.875, Confidence.Certain), match);
+  }
 
-    [Fact]
-    public void Classify_marks_a_low_similarity_candidate_as_uncertain()
+  [Fact]
+  public void Classify_marks_a_low_similarity_candidate_as_uncertain() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "context before line zero old side aaa",
             "totally unrelated old content xyz123",
             "different structure entirely qqq999",
             "context after line old side bbb",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "context before line zero new side ccc",
             "completely different new stuff foo456",
             "nothing in common here at all zzz000",
             "another line making it three long here",
             "context after line new side ddd",
         };
-        var candidates = new[] { new BlockCandidate(1, 2, 1, 3) };
+    var candidates = new[] { new BlockCandidate(1, 2, 1, 3) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Uncertain, match.MatchType);
-        Assert.Equal(0.4036458333333333, match.Score, 15);
-        Assert.Equal(Confidence.Weak, match.Confidence);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Uncertain, match.MatchType);
+    Assert.Equal(0.4036458333333333, match.Score, 15);
+    Assert.Equal(Confidence.Weak, match.Confidence);
+  }
 
-    [Fact]
-    public void Classify_applies_strict_mode_threshold_but_leaves_confidence_score_derived()
+  [Fact]
+  public void Classify_applies_strict_mode_threshold_but_leaves_confidence_score_derived() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -160,54 +153,52 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Strict);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Strict);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Uncertain, match.MatchType);
-        Assert.Equal(Confidence.Certain, match.Confidence);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Uncertain, match.MatchType);
+    Assert.Equal(Confidence.Certain, match.Confidence);
+  }
 
-    [Fact]
-    public void Classify_applies_aggressive_mode_threshold_and_marks_previously_uncertain_candidate_as_moved()
+  [Fact]
+  public void Classify_applies_aggressive_mode_threshold_and_marks_previously_uncertain_candidate_as_moved() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "context before line zero old side aaa",
             "totally unrelated old content xyz123",
             "different structure entirely qqq999",
             "context after line old side bbb",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "context before line zero new side ccc",
             "completely different new stuff foo456",
             "nothing in common here at all zzz000",
             "another line making it three long here",
             "context after line new side ddd",
         };
-        var candidates = new[] { new BlockCandidate(1, 2, 1, 3) };
+    var candidates = new[] { new BlockCandidate(1, 2, 1, 3) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Aggressive);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Aggressive);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Moved, match.MatchType);
-        Assert.Equal(Confidence.Weak, match.Confidence);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Moved, match.MatchType);
+    Assert.Equal(Confidence.Weak, match.Confidence);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_uncertain_when_below_minimum_block_size()
+  [Fact]
+  public void Classify_marks_a_candidate_as_uncertain_when_below_minimum_block_size() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -217,28 +208,27 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 4);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 4);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Uncertain, match.MatchType);
-        Assert.Equal(0.875, match.Score);
-        Assert.Equal(Confidence.Certain, match.Confidence);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Uncertain, match.MatchType);
+    Assert.Equal(0.875, match.Score);
+    Assert.Equal(Confidence.Certain, match.Confidence);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_moved_when_at_minimum_block_size_boundary()
+  [Fact]
+  public void Classify_marks_a_candidate_as_moved_when_at_minimum_block_size_boundary() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -248,26 +238,25 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 3);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 3);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Moved, match.MatchType);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Moved, match.MatchType);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_uncertain_when_below_minimum_token_count()
+  [Fact]
+  public void Classify_marks_a_candidate_as_uncertain_when_below_minimum_token_count() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -277,28 +266,27 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 19);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 19);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Uncertain, match.MatchType);
-        Assert.Equal(0.875, match.Score);
-        Assert.Equal(Confidence.Certain, match.Confidence);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Uncertain, match.MatchType);
+    Assert.Equal(0.875, match.Score);
+    Assert.Equal(Confidence.Certain, match.Confidence);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_moved_when_at_minimum_token_count_boundary()
+  [Fact]
+  public void Classify_marks_a_candidate_as_moved_when_at_minimum_token_count_boundary() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -308,27 +296,26 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 18);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 18);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Moved, match.MatchType);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Moved, match.MatchType);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_uncertain_when_exceeding_maximum_duplicate_anchor_frequency()
+  [Fact]
+  public void Classify_marks_a_candidate_as_uncertain_when_exceeding_maximum_duplicate_anchor_frequency() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
             "block line Alpha long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -338,32 +325,31 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 0, maxDuplicateAnchorFrequency: 1);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 0, maxDuplicateAnchorFrequency: 1);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Uncertain, match.MatchType);
-        // The extra duplicate old-line (added only to exercise this filter) also
-        // shifts the whole-file rarity-weighted component of the combined score,
-        // so this is lower than the 0.875 baseline used by the other FR-016 tests.
-        Assert.Equal(0.85416666666666663, match.Score, 15);
-        Assert.Equal(Confidence.Certain, match.Confidence);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Uncertain, match.MatchType);
+    // The extra duplicate old-line (added only to exercise this filter) also
+    // shifts the whole-file rarity-weighted component of the combined score,
+    // so this is lower than the 0.875 baseline used by the other FR-016 tests.
+    Assert.Equal(0.85416666666666663, match.Score, 15);
+    Assert.Equal(Confidence.Certain, match.Confidence);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_moved_when_at_maximum_duplicate_anchor_frequency_boundary()
+  [Fact]
+  public void Classify_marks_a_candidate_as_moved_when_at_maximum_duplicate_anchor_frequency_boundary() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
             "block line Alpha long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -373,26 +359,25 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 0, maxDuplicateAnchorFrequency: 2);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, DetectionMode.Balanced, minBlockSize: 1, minTokenCount: 0, maxDuplicateAnchorFrequency: 2);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Moved, match.MatchType);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Moved, match.MatchType);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_moved_edited_when_score_is_below_pure_move_threshold()
+  [Fact]
+  public void Classify_marks_a_candidate_as_moved_edited_when_score_is_below_pure_move_threshold() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -402,27 +387,26 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, pureMoveThreshold: 0.90);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, pureMoveThreshold: 0.90);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.MovedEdited, match.MatchType);
-        Assert.Equal(0.875, match.Score);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.MovedEdited, match.MatchType);
+    Assert.Equal(0.875, match.Score);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_moved_when_no_pure_move_threshold_is_supplied()
+  [Fact]
+  public void Classify_marks_a_candidate_as_moved_when_no_pure_move_threshold_is_supplied() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "filler original line zero content aaa",
             "block line Alpha long enough content",
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "filler new line zero content bbb",
             "filler new line one content ccc",
             "filler new line two content ddd",
@@ -432,34 +416,33 @@ public class BlockClassifierTests
             "block line Beta long enough content",
             "block line Gamma long enough content",
         };
-        var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
+    var candidates = new[] { new BlockCandidate(1, 3, 5, 7) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Moved, match.MatchType);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Moved, match.MatchType);
+  }
 
-    [Fact]
-    public void Classify_marks_a_candidate_as_moved_when_score_is_at_or_above_pure_move_threshold()
+  [Fact]
+  public void Classify_marks_a_candidate_as_moved_when_score_is_at_or_above_pure_move_threshold() {
+    var oldLines = new[]
     {
-        var oldLines = new[]
-        {
             "block line Alpha long enough content here",
             "block line Beta long enough content here",
             "block line Gamma long enough content here",
         };
-        var newLines = new[]
-        {
+    var newLines = new[]
+    {
             "block line Alpha long enough content here",
             "block line Beta long enough content here",
             "block line Gamma long enough content here",
         };
-        var candidates = new[] { new BlockCandidate(0, 2, 0, 2) };
+    var candidates = new[] { new BlockCandidate(0, 2, 0, 2) };
 
-        var result = BlockClassifier.Classify(candidates, oldLines, newLines, pureMoveThreshold: 0.90);
+    var result = BlockClassifier.Classify(candidates, oldLines, newLines, pureMoveThreshold: 0.90);
 
-        var match = Assert.Single(result);
-        Assert.Equal(ChangeType.Moved, match.MatchType);
-    }
+    var match = Assert.Single(result);
+    Assert.Equal(ChangeType.Moved, match.MatchType);
+  }
 }

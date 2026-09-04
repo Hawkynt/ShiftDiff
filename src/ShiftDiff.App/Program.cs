@@ -2,13 +2,12 @@ using Avalonia;
 
 namespace ShiftDiff.App;
 
-internal static class Program
-{
-    [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+internal static class Program {
+  [STAThread]
+  public static void Main(string[] args) => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
 
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>()
-            .UsePlatformDetect();
+  public static AppBuilder BuildAvaloniaApp() =>
+      AppBuilder.Configure<App>()
+          .UsePlatformDetect();
 }
 
