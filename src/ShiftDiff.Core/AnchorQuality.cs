@@ -1,8 +1,7 @@
 namespace ShiftDiff.Core;
 
-public enum AnchorQuality
-{
-    Rejected,
-    Weak,
-    Strong
+public enum AnchorQuality {
+  Rejected,
+  Weak,
+  Strong
 }

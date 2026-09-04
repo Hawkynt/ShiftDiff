@@ -3,64 +3,59 @@ using ShiftDiff.Core;
 namespace ShiftDiff.Ui;
 
 /// <summary>How a run of characters inside one displayed line changed.</summary>
-public enum DiffSegmentKind
-{
-    Unchanged,
-    Added,
-    Removed,
-    Edited,
+public enum DiffSegmentKind {
+  Unchanged,
+  Added,
+  Removed,
+  Edited,
 }
 
 /// <summary>What one pane shows for one row.</summary>
-public enum CellState
-{
-    /// <summary>The pane contributes no line here (the other side is longer).</summary>
-    Empty,
-    Unchanged,
-    Added,
-    Removed,
-    Edited,
-    Moved,
-    MovedEdited,
-    Conflict,
+public enum CellState {
+  /// <summary>The pane contributes no line here (the other side is longer).</summary>
+  Empty,
+  Unchanged,
+  Added,
+  Removed,
+  Edited,
+  Moved,
+  MovedEdited,
+  Conflict,
 }
 
 /// <summary>Where a row sits inside its change block, so a pane can draw the box around it.</summary>
-public enum BlockEdge
-{
-    None,
-    Single,
-    First,
-    Middle,
-    Last,
+public enum BlockEdge {
+  None,
+  Single,
+  First,
+  Middle,
+  Last,
 }
 
-public enum DiffRowKind
-{
-    Line,
+public enum DiffRowKind {
+  Line,
 
-    /// <summary>A folded run of unchanged lines the user can expand.</summary>
-    Collapsed,
+  /// <summary>A folded run of unchanged lines the user can expand.</summary>
+  Collapsed,
 }
 
 /// <summary>A run of characters with both its diff state and its syntax class.</summary>
 // The Is* properties exist so a view can switch style classes per run without a
 // converter for every combination.
-public sealed record DiffSegment(string Text, DiffSegmentKind Kind, SourceTokenKind Syntax = SourceTokenKind.Identifier)
-{
-    public bool IsAdded => Kind == DiffSegmentKind.Added;
+public sealed record DiffSegment(string Text, DiffSegmentKind Kind, SourceTokenKind Syntax = SourceTokenKind.Identifier) {
+  public bool IsAdded => Kind == DiffSegmentKind.Added;
 
-    public bool IsRemoved => Kind == DiffSegmentKind.Removed;
+  public bool IsRemoved => Kind == DiffSegmentKind.Removed;
 
-    public bool IsKeyword => Syntax == SourceTokenKind.Keyword;
+  public bool IsKeyword => Syntax == SourceTokenKind.Keyword;
 
-    public bool IsString => Syntax == SourceTokenKind.String;
+  public bool IsString => Syntax == SourceTokenKind.String;
 
-    public bool IsComment => Syntax == SourceTokenKind.Comment;
+  public bool IsComment => Syntax == SourceTokenKind.Comment;
 
-    public bool IsNumber => Syntax == SourceTokenKind.Number;
+  public bool IsNumber => Syntax == SourceTokenKind.Number;
 
-    public bool IsOperator => Syntax is SourceTokenKind.Operator or SourceTokenKind.Punctuation;
+  public bool IsOperator => Syntax is SourceTokenKind.Operator or SourceTokenKind.Punctuation;
 }
 
 public sealed record DiffCell(
@@ -72,40 +67,39 @@ public sealed record DiffCell(
     BlockEdge Edge = BlockEdge.None,
     bool CanTransfer = false,
     string TransferGlyph = "",
-    string TransferTip = "")
-{
-    public static DiffCell Empty { get; } = new(null, [], CellState.Empty);
+    string TransferTip = "") {
+  public static DiffCell Empty { get; } = new(null, [], CellState.Empty);
 
-    public bool IsBlockStart => Edge is BlockEdge.First or BlockEdge.Single;
+  public bool IsBlockStart => Edge is BlockEdge.First or BlockEdge.Single;
 
-    public bool IsBlockSingle => Edge == BlockEdge.Single;
+  public bool IsBlockSingle => Edge == BlockEdge.Single;
 
-    public bool IsBlockFirst => Edge == BlockEdge.First;
+  public bool IsBlockFirst => Edge == BlockEdge.First;
 
-    public bool IsBlockMiddle => Edge == BlockEdge.Middle;
+  public bool IsBlockMiddle => Edge == BlockEdge.Middle;
 
-    public bool IsBlockLast => Edge == BlockEdge.Last;
+  public bool IsBlockLast => Edge == BlockEdge.Last;
 
-    public bool IsInBlock => Edge != BlockEdge.None;
+  public bool IsInBlock => Edge != BlockEdge.None;
 
-    /// <summary>The rightmost pane draws no divider gutter after it.</summary>
-    public bool IsLastPane { get; init; }
+  /// <summary>The rightmost pane draws no divider gutter after it.</summary>
+  public bool IsLastPane { get; init; }
 
-    public string Text => string.Concat(Segments.Select(segment => segment.Text));
+  public string Text => string.Concat(Segments.Select(segment => segment.Text));
 
-    public string LineNumberText => LineNumber is { } number ? number.ToString() : string.Empty;
+  public string LineNumberText => LineNumber is { } number ? number.ToString() : string.Empty;
 
-    public bool IsEmpty => State == CellState.Empty;
+  public bool IsEmpty => State == CellState.Empty;
 
-    public bool IsAdded => State == CellState.Added;
+  public bool IsAdded => State == CellState.Added;
 
-    public bool IsRemoved => State == CellState.Removed;
+  public bool IsRemoved => State == CellState.Removed;
 
-    public bool IsEdited => State == CellState.Edited;
+  public bool IsEdited => State == CellState.Edited;
 
-    public bool IsMoved => State is CellState.Moved or CellState.MovedEdited;
+  public bool IsMoved => State is CellState.Moved or CellState.MovedEdited;
 
-    public bool IsConflict => State == CellState.Conflict;
+  public bool IsConflict => State == CellState.Conflict;
 }
 
 /// <summary>One displayed row across every pane of the current layout.</summary>
@@ -119,39 +113,38 @@ public sealed record DiffRow(
     int? OldIndex = null,
     int? NewIndex = null,
     int? BlockId = null,
-    BlockEdge Edge = BlockEdge.None)
-{
-    public bool IsChanged => Kind == DiffRowKind.Line && (ChangeType != ChangeType.Unchanged || IsMoved);
+    BlockEdge Edge = BlockEdge.None) {
+  public bool IsChanged => Kind == DiffRowKind.Line && (ChangeType != ChangeType.Unchanged || IsMoved);
 
-    public bool IsConflict => ChangeType == ChangeType.Conflict;
+  public bool IsConflict => ChangeType == ChangeType.Conflict;
 
-    // A line that belongs to a relocated block reads as "moved" whichever side it
-    // is on: showing it as a plain add/remove pair is exactly what this tool exists
-    // to avoid.
-    public ChangeType DisplayChangeType => IsMoved
-        ? ChangeType == ChangeType.Edited ? ChangeType.MovedEdited : ChangeType.Moved
-        : ChangeType;
+  // A line that belongs to a relocated block reads as "moved" whichever side it
+  // is on: showing it as a plain add/remove pair is exactly what this tool exists
+  // to avoid.
+  public ChangeType DisplayChangeType => IsMoved
+      ? ChangeType == ChangeType.Edited ? ChangeType.MovedEdited : ChangeType.Moved
+      : ChangeType;
 
-    // Unchanged lines carry no marker — a gutter full of ticks is noise.
-    public string Marker => IsChanged ? ChangeMarker.Text(DisplayChangeType) : string.Empty;
+  // Unchanged lines carry no marker — a gutter full of ticks is noise.
+  public string Marker => IsChanged ? ChangeMarker.Text(DisplayChangeType) : string.Empty;
 
-    public string EmojiMarker => IsChanged ? ChangeMarker.Emoji(DisplayChangeType) : string.Empty;
+  public string EmojiMarker => IsChanged ? ChangeMarker.Emoji(DisplayChangeType) : string.Empty;
 
-    public string Label => Kind == DiffRowKind.Collapsed
-        ? $"{HiddenLineCount} unchanged line(s)"
-        : ChangeMarker.Label(DisplayChangeType);
+  public string Label => Kind == DiffRowKind.Collapsed
+      ? $"{HiddenLineCount} unchanged line(s)"
+      : ChangeMarker.Label(DisplayChangeType);
 
-    public bool IsCollapsed => Kind == DiffRowKind.Collapsed;
+  public bool IsCollapsed => Kind == DiffRowKind.Collapsed;
 
-    public bool IsLine => Kind == DiffRowKind.Line;
+  public bool IsLine => Kind == DiffRowKind.Line;
 
-    public bool IsAdded => ChangeType == ChangeType.Added;
+  public bool IsAdded => ChangeType == ChangeType.Added;
 
-    public bool IsRemoved => ChangeType == ChangeType.Removed;
+  public bool IsRemoved => ChangeType == ChangeType.Removed;
 
-    public bool IsEdited => ChangeType == ChangeType.Edited;
+  public bool IsEdited => ChangeType == ChangeType.Edited;
 
-    public string CollapsedText => $"⋯  {HiddenLineCount} unchanged lines  ⋯";
+  public string CollapsedText => $"⋯  {HiddenLineCount} unchanged lines  ⋯";
 }
 
 /// <summary>A moved block plus the row indices where each of its ends is shown (FR-045 jump-to-pair).</summary>
@@ -165,15 +158,14 @@ public sealed record MovedBlockInfo(
     int NewStart,
     int NewEnd,
     int OldRowIndex,
-    int NewRowIndex)
-{
-    public string Title => $"{ChangeMarker.Label(MatchType)} · {ChangeMarker.Label(Confidence)}";
+    int NewRowIndex) {
+  public string Title => $"{ChangeMarker.Label(MatchType)} · {ChangeMarker.Label(Confidence)}";
 
-    public string Range => $"old {OldStart + 1}–{OldEnd + 1} → new {NewStart + 1}–{NewEnd + 1}";
+  public string Range => $"old {OldStart + 1}–{OldEnd + 1} → new {NewStart + 1}–{NewEnd + 1}";
 
-    public string ScoreText => Score.ToString("P0");
+  public string ScoreText => Score.ToString("P0");
 
-    public int LineCount => OldEnd - OldStart + 1;
+  public int LineCount => OldEnd - OldStart + 1;
 }
 
 public sealed record DiffSummary(
@@ -182,15 +174,14 @@ public sealed record DiffSummary(
     int Edited,
     int Unchanged,
     int MovedBlocks,
-    int Conflicts)
-{
-    public int TotalChanges => Added + Removed + Edited + Conflicts;
+    int Conflicts) {
+  public int TotalChanges => Added + Removed + Edited + Conflicts;
 
-    public bool HasDifferences => TotalChanges > 0 || MovedBlocks > 0;
+  public bool HasDifferences => TotalChanges > 0 || MovedBlocks > 0;
 
-    public string Text =>
-        $"{Added} added · {Removed} removed · {Edited} edited · {MovedBlocks} moved" +
-        (Conflicts > 0 ? $" · {Conflicts} conflicts" : string.Empty);
+  public string Text =>
+      $"{Added} added · {Removed} removed · {Edited} edited · {MovedBlocks} moved" +
+      (Conflicts > 0 ? $" · {Conflicts} conflicts" : string.Empty);
 }
 
 /// <summary>One stripe of the overview bar / minimap, positioned in normalized 0..1 document space.</summary>
@@ -208,7 +199,6 @@ public sealed record PaneLink(
     int SourceEndRow,
     int TargetStartRow,
     int TargetEndRow,
-    ChangeType Kind)
-{
-    public bool IsRelocation => Kind is ChangeType.Moved or ChangeType.MovedEdited;
+    ChangeType Kind) {
+  public bool IsRelocation => Kind is ChangeType.Moved or ChangeType.MovedEdited;
 }

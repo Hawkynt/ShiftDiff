@@ -2,216 +2,194 @@ using ShiftDiff.Vcs;
 
 namespace ShiftDiff.Vcs.Tests;
 
-public class GitProviderTests : IDisposable
-{
-    private static readonly string Newline = new(['\n']);
+public class GitProviderTests : IDisposable {
+  private static readonly string Newline = new(['\n']);
 
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "shiftdiff-vcs", Guid.NewGuid().ToString("N"));
+  private readonly string _root = Path.Combine(Path.GetTempPath(), "shiftdiff-vcs", Guid.NewGuid().ToString("N"));
 
-    public GitProviderTests() => Directory.CreateDirectory(_root);
+  public GitProviderTests() => Directory.CreateDirectory(_root);
 
-    public void Dispose()
-    {
-        if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
-    }
+  public void Dispose() {
+    if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+  }
 
-    [Fact]
-    public void Detect_DirectoryContainingDotGit_ReturnsThatDirectoryAsRoot()
-    {
-        Directory.CreateDirectory(Path.Combine(_root, ".git"));
-        var nested = Directory.CreateDirectory(Path.Combine(_root, "src", "deep")).FullName;
+  [Fact]
+  public void Detect_DirectoryContainingDotGit_ReturnsThatDirectoryAsRoot() {
+    Directory.CreateDirectory(Path.Combine(_root, ".git"));
+    var nested = Directory.CreateDirectory(Path.Combine(_root, "src", "deep")).FullName;
 
-        var info = new GitProvider(new FakeProcessRunner()).Detect(nested);
+    var info = new GitProvider(new FakeProcessRunner()).Detect(nested);
 
-        Assert.NotNull(info);
-        Assert.Equal(VcsKind.Git, info!.Kind);
-        Assert.Equal(Path.GetFullPath(_root), Path.GetFullPath(info.Root));
-    }
+    Assert.NotNull(info);
+    Assert.Equal(VcsKind.Git, info!.Kind);
+    Assert.Equal(Path.GetFullPath(_root), Path.GetFullPath(info.Root));
+  }
 
-    [Fact]
-    public void Detect_WorktreeWhereDotGitIsAFile_StillFindsTheRoot()
-    {
-        File.WriteAllText(Path.Combine(_root, ".git"), "gitdir: ../.git/worktrees/x\n");
+  [Fact]
+  public void Detect_WorktreeWhereDotGitIsAFile_StillFindsTheRoot() {
+    File.WriteAllText(Path.Combine(_root, ".git"), "gitdir: ../.git/worktrees/x\n");
 
-        Assert.NotNull(new GitProvider(new FakeProcessRunner()).Detect(_root));
-    }
+    Assert.NotNull(new GitProvider(new FakeProcessRunner()).Detect(_root));
+  }
 
-    [Fact]
-    public void Detect_PathWithoutRepository_ReturnsNull()
-    {
-        Assert.Null(new GitProvider(new FakeProcessRunner()).Detect(_root));
-    }
+  [Fact]
+  public void Detect_PathWithoutRepository_ReturnsNull() {
+    Assert.Null(new GitProvider(new FakeProcessRunner()).Detect(_root));
+  }
 
-    [Fact]
-    public void Detect_NonExistentPath_ReturnsNull()
-    {
-        Assert.Null(new GitProvider(new FakeProcessRunner()).Detect(Path.Combine(_root, "nope")));
-    }
+  [Fact]
+  public void Detect_NonExistentPath_ReturnsNull() {
+    Assert.Null(new GitProvider(new FakeProcessRunner()).Detect(Path.Combine(_root, "nope")));
+  }
 
-    [Fact]
-    public void GetWorkingChanges_AsksGitForPorcelainStatusAndParsesIt()
-    {
-        var runner = new FakeProcessRunner().Respond("status", " M src/File.cs\n?? new.txt\n");
+  [Fact]
+  public void GetWorkingChanges_AsksGitForPorcelainStatusAndParsesIt() {
+    var runner = new FakeProcessRunner().Respond("status", " M src/File.cs\n?? new.txt\n");
 
-        var changes = new GitProvider(runner).GetWorkingChanges(_root);
+    var changes = new GitProvider(runner).GetWorkingChanges(_root);
 
-        Assert.Contains("--porcelain=v1", runner.LastCommandLine);
-        Assert.Equal(2, changes.Count);
-        Assert.Equal(VcsChangeKind.Modified, changes[0].Kind);
-        Assert.Equal(VcsChangeKind.Untracked, changes[1].Kind);
-    }
+    Assert.Contains("--porcelain=v1", runner.LastCommandLine);
+    Assert.Equal(2, changes.Count);
+    Assert.Equal(VcsChangeKind.Modified, changes[0].Kind);
+    Assert.Equal(VcsChangeKind.Untracked, changes[1].Kind);
+  }
 
-    [Fact]
-    public void GetStagedChanges_UsesTheIndexDiffAndMarksEntriesStaged()
-    {
-        var runner = new FakeProcessRunner().Respond("--cached", "M\tsrc/File.cs\n");
+  [Fact]
+  public void GetStagedChanges_UsesTheIndexDiffAndMarksEntriesStaged() {
+    var runner = new FakeProcessRunner().Respond("--cached", "M\tsrc/File.cs\n");
 
-        var change = Assert.Single(new GitProvider(runner).GetStagedChanges(_root));
+    var change = Assert.Single(new GitProvider(runner).GetStagedChanges(_root));
 
-        Assert.True(change.Staged);
-        Assert.Contains("--cached", runner.LastCommandLine);
-    }
+    Assert.True(change.Staged);
+    Assert.Contains("--cached", runner.LastCommandLine);
+  }
 
-    [Fact]
-    public void GetChanges_BetweenTwoRevisions_PassesBothToGitDiff()
-    {
-        var runner = new FakeProcessRunner().Respond("diff", "M\tsrc/File.cs\n");
+  [Fact]
+  public void GetChanges_BetweenTwoRevisions_PassesBothToGitDiff() {
+    var runner = new FakeProcessRunner().Respond("diff", "M\tsrc/File.cs\n");
 
-        new GitProvider(runner).GetChanges(_root, "v1.0", "v2.0");
+    new GitProvider(runner).GetChanges(_root, "v1.0", "v2.0");
 
-        Assert.Contains("v1.0", runner.LastCommandLine);
-        Assert.Contains("v2.0", runner.LastCommandLine);
-        Assert.Contains("--name-status", runner.LastCommandLine);
-    }
+    Assert.Contains("v1.0", runner.LastCommandLine);
+    Assert.Contains("v2.0", runner.LastCommandLine);
+    Assert.Contains("--name-status", runner.LastCommandLine);
+  }
 
-    [Fact]
-    public void GetChanges_WithNoRevisions_FallsBackToTheWorkingTreeStatus()
-    {
-        var runner = new FakeProcessRunner().Respond("status", " M f.cs\n");
+  [Fact]
+  public void GetChanges_WithNoRevisions_FallsBackToTheWorkingTreeStatus() {
+    var runner = new FakeProcessRunner().Respond("status", " M f.cs\n");
 
-        var change = Assert.Single(new GitProvider(runner).GetChanges(_root, "", ""));
+    var change = Assert.Single(new GitProvider(runner).GetChanges(_root, "", ""));
 
-        Assert.Equal("f.cs", change.Path);
-        Assert.Contains("status", runner.LastCommandLine);
-    }
+    Assert.Equal("f.cs", change.Path);
+    Assert.Contains("status", runner.LastCommandLine);
+  }
 
-    [Fact]
-    public void GetChanges_RevisionAgainstWorkingTree_OmitsTheSecondRevision()
-    {
-        var runner = new FakeProcessRunner().Respond("diff", "M\tf.cs\n");
+  [Fact]
+  public void GetChanges_RevisionAgainstWorkingTree_OmitsTheSecondRevision() {
+    var runner = new FakeProcessRunner().Respond("diff", "M\tf.cs\n");
 
-        new GitProvider(runner).GetChanges(_root, "HEAD", "");
+    new GitProvider(runner).GetChanges(_root, "HEAD", "");
 
-        Assert.Contains("HEAD", runner.LastCommandLine);
-        Assert.DoesNotContain("HEAD HEAD", runner.LastCommandLine);
-    }
+    Assert.Contains("HEAD", runner.LastCommandLine);
+    Assert.DoesNotContain("HEAD HEAD", runner.LastCommandLine);
+  }
 
-    // A freshly initialised repository has no HEAD: its working tree is the diff.
-    [Fact]
-    public void GetChanges_AgainstAHeadThatDoesNotExistYet_FallsBackToTheWorkingTree()
-    {
-        var runner = new FakeProcessRunner()
-            .RespondWithFailure("rev-parse", string.Empty)
-            .RespondWithFailure("diff", "fatal: ambiguous argument 'HEAD'", 128)
-            .Respond("status", "?? new.txt" + Newline);
+  // A freshly initialised repository has no HEAD: its working tree is the diff.
+  [Fact]
+  public void GetChanges_AgainstAHeadThatDoesNotExistYet_FallsBackToTheWorkingTree() {
+    var runner = new FakeProcessRunner()
+        .RespondWithFailure("rev-parse", string.Empty)
+        .RespondWithFailure("diff", "fatal: ambiguous argument 'HEAD'", 128)
+        .Respond("status", "?? new.txt" + Newline);
 
-        var change = Assert.Single(new GitProvider(runner).GetChanges(_root, "HEAD", ""));
+    var change = Assert.Single(new GitProvider(runner).GetChanges(_root, "HEAD", ""));
 
-        Assert.Equal(VcsChangeKind.Untracked, change.Kind);
-    }
+    Assert.Equal(VcsChangeKind.Untracked, change.Kind);
+  }
 
-    [Fact]
-    public void GetChanges_AgainstARevisionThatExists_ReportsTheFailureInsteadOfHidingIt()
-    {
-        var runner = new FakeProcessRunner()
-            .Respond("rev-parse", "abc123" + Newline)
-            .RespondWithFailure("diff", "fatal: bad object", 128);
+  [Fact]
+  public void GetChanges_AgainstARevisionThatExists_ReportsTheFailureInsteadOfHidingIt() {
+    var runner = new FakeProcessRunner()
+        .Respond("rev-parse", "abc123" + Newline)
+        .RespondWithFailure("diff", "fatal: bad object", 128);
 
-        Assert.Throws<VcsCommandException>(() => new GitProvider(runner).GetChanges(_root, "v1.0", ""));
-    }
+    Assert.Throws<VcsCommandException>(() => new GitProvider(runner).GetChanges(_root, "v1.0", ""));
+  }
 
-    [Fact]
-    public void RevisionExists_AsksGitToVerifyTheCommit()
-    {
-        var runner = new FakeProcessRunner().Respond("rev-parse", "abc123" + Newline);
+  [Fact]
+  public void RevisionExists_AsksGitToVerifyTheCommit() {
+    var runner = new FakeProcessRunner().Respond("rev-parse", "abc123" + Newline);
 
-        Assert.True(new GitProvider(runner).RevisionExists(_root, "HEAD"));
-        Assert.Contains("--verify", runner.LastCommandLine);
-    }
+    Assert.True(new GitProvider(runner).RevisionExists(_root, "HEAD"));
+    Assert.Contains("--verify", runner.LastCommandLine);
+  }
 
-    [Fact]
-    public void RevisionExists_ForAnEmptyRevision_IsFalse()
-    {
-        Assert.False(new GitProvider(new FakeProcessRunner()).RevisionExists(_root, string.Empty));
-    }
+  [Fact]
+  public void RevisionExists_ForAnEmptyRevision_IsFalse() {
+    Assert.False(new GitProvider(new FakeProcessRunner()).RevisionExists(_root, string.Empty));
+  }
 
-    [Fact]
-    public void GetFileContent_AtRevision_UsesGitShowWithRevisionColonPath()
-    {
-        var runner = new FakeProcessRunner().Respond("show", "file contents\n");
+  [Fact]
+  public void GetFileContent_AtRevision_UsesGitShowWithRevisionColonPath() {
+    var runner = new FakeProcessRunner().Respond("show", "file contents\n");
 
-        var content = new GitProvider(runner).GetFileContent(_root, "src/File.cs", "HEAD");
+    var content = new GitProvider(runner).GetFileContent(_root, "src/File.cs", "HEAD");
 
-        Assert.Equal("file contents\n", content);
-        Assert.Contains("HEAD:src/File.cs", runner.LastCommandLine);
-    }
+    Assert.Equal("file contents\n", content);
+    Assert.Contains("HEAD:src/File.cs", runner.LastCommandLine);
+  }
 
-    [Fact]
-    public void GetFileContent_AtRevisionWhereFileDoesNotExist_ReturnsEmptyRatherThanThrowing()
-    {
-        var runner = new FakeProcessRunner().RespondWithFailure("show", "fatal: path does not exist");
+  [Fact]
+  public void GetFileContent_AtRevisionWhereFileDoesNotExist_ReturnsEmptyRatherThanThrowing() {
+    var runner = new FakeProcessRunner().RespondWithFailure("show", "fatal: path does not exist");
 
-        Assert.Equal(string.Empty, new GitProvider(runner).GetFileContent(_root, "gone.cs", "HEAD"));
-    }
+    Assert.Equal(string.Empty, new GitProvider(runner).GetFileContent(_root, "gone.cs", "HEAD"));
+  }
 
-    [Fact]
-    public void GetFileContent_WorkingTreeRevision_ReadsFromDisk()
-    {
-        File.WriteAllText(Path.Combine(_root, "onDisk.cs"), "live content");
-        var runner = new FakeProcessRunner();
+  [Fact]
+  public void GetFileContent_WorkingTreeRevision_ReadsFromDisk() {
+    File.WriteAllText(Path.Combine(_root, "onDisk.cs"), "live content");
+    var runner = new FakeProcessRunner();
 
-        var content = new GitProvider(runner).GetFileContent(_root, "onDisk.cs", VcsRevisions.WorkingTree);
+    var content = new GitProvider(runner).GetFileContent(_root, "onDisk.cs", VcsRevisions.WorkingTree);
 
-        Assert.Equal("live content", content);
-        Assert.Empty(runner.Invocations);
-    }
+    Assert.Equal("live content", content);
+    Assert.Empty(runner.Invocations);
+  }
 
-    [Fact]
-    public void GetFileContent_WorkingTreeFileMissing_ReturnsEmpty()
-    {
-        Assert.Equal(string.Empty, new GitProvider(new FakeProcessRunner()).GetFileContent(_root, "nope.cs", ""));
-    }
+  [Fact]
+  public void GetFileContent_WorkingTreeFileMissing_ReturnsEmpty() {
+    Assert.Equal(string.Empty, new GitProvider(new FakeProcessRunner()).GetFileContent(_root, "nope.cs", ""));
+  }
 
-    [Fact]
-    public void GetHistory_PassesTheLimitAndPathToGitLog()
-    {
-        var separator = GitOutputParser.LogFieldSeparator;
-        var runner = new FakeProcessRunner().Respond("log", $"abc{separator}Ada{separator}2024-01-01T00:00:00Z{separator}Message\n");
+  [Fact]
+  public void GetHistory_PassesTheLimitAndPathToGitLog() {
+    var separator = GitOutputParser.LogFieldSeparator;
+    var runner = new FakeProcessRunner().Respond("log", $"abc{separator}Ada{separator}2024-01-01T00:00:00Z{separator}Message\n");
 
-        var revisions = new GitProvider(runner).GetHistory(_root, "src/File.cs", limit: 5);
+    var revisions = new GitProvider(runner).GetHistory(_root, "src/File.cs", limit: 5);
 
-        Assert.Single(revisions);
-        Assert.Contains("--max-count=5", runner.LastCommandLine);
-        Assert.Contains("src/File.cs", runner.LastCommandLine);
-    }
+    Assert.Single(revisions);
+    Assert.Contains("--max-count=5", runner.LastCommandLine);
+    Assert.Contains("src/File.cs", runner.LastCommandLine);
+  }
 
-    [Fact]
-    public void FailingCommand_RaisesAVcsCommandExceptionCarryingGitsMessage()
-    {
-        var runner = new FakeProcessRunner().RespondWithFailure("status", "fatal: not a git repository", 128);
+  [Fact]
+  public void FailingCommand_RaisesAVcsCommandExceptionCarryingGitsMessage() {
+    var runner = new FakeProcessRunner().RespondWithFailure("status", "fatal: not a git repository", 128);
 
-        var exception = Assert.Throws<VcsCommandException>(() => new GitProvider(runner).GetWorkingChanges(_root));
+    var exception = Assert.Throws<VcsCommandException>(() => new GitProvider(runner).GetWorkingChanges(_root));
 
-        Assert.Contains("not a git repository", exception.Message);
-    }
+    Assert.Contains("not a git repository", exception.Message);
+  }
 
-    [Fact]
-    public void Commands_RunInsideTheRepositoryRoot()
-    {
-        var runner = new FakeProcessRunner();
+  [Fact]
+  public void Commands_RunInsideTheRepositoryRoot() {
+    var runner = new FakeProcessRunner();
 
-        new GitProvider(runner).GetWorkingChanges(_root);
+    new GitProvider(runner).GetWorkingChanges(_root);
 
-        Assert.Equal(_root, runner.Invocations[0].WorkingDirectory);
-    }
+    Assert.Equal(_root, runner.Invocations[0].WorkingDirectory);
+  }
 }

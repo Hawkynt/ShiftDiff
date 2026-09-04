@@ -2,85 +2,75 @@ using System.Text;
 
 namespace ShiftDiff.Core;
 
-public enum IniChangeType
-{
-    Added,
-    Removed,
-    Changed,
-    Unchanged,
+public enum IniChangeType {
+  Added,
+  Removed,
+  Changed,
+  Unchanged,
 }
 
 public sealed record IniChange(string Path, IniChangeType ChangeType, string? OldValue = null, string? NewValue = null);
 
-public static class IniComparer
-{
-    public static IniChange[] Compare(byte[] baseIni, byte[] targetIni)
-    {
-        var baseEntries = Parse(Encoding.UTF8.GetString(baseIni));
-        var targetEntries = Parse(Encoding.UTF8.GetString(targetIni));
+public static class IniComparer {
+  public static IniChange[] Compare(byte[] baseIni, byte[] targetIni) {
+    var baseEntries = Parse(Encoding.UTF8.GetString(baseIni));
+    var targetEntries = Parse(Encoding.UTF8.GetString(targetIni));
 
-        var paths = baseEntries.Keys.Union(targetEntries.Keys).OrderBy(p => p, StringComparer.Ordinal);
+    var paths = baseEntries.Keys.Union(targetEntries.Keys).OrderBy(p => p, StringComparer.Ordinal);
 
-        var changes = new List<IniChange>();
-        foreach (var path in paths)
-        {
-            var hasOld = baseEntries.TryGetValue(path, out var oldValue);
-            var hasNew = targetEntries.TryGetValue(path, out var newValue);
+    var changes = new List<IniChange>();
+    foreach (var path in paths) {
+      var hasOld = baseEntries.TryGetValue(path, out var oldValue);
+      var hasNew = targetEntries.TryGetValue(path, out var newValue);
 
-            var changeType = (hasOld, hasNew) switch
-            {
-                (false, true) => IniChangeType.Added,
-                (true, false) => IniChangeType.Removed,
-                (true, true) when oldValue == newValue => IniChangeType.Unchanged,
-                _ => IniChangeType.Changed,
-            };
+      var changeType = (hasOld, hasNew) switch {
+        (false, true) => IniChangeType.Added,
+        (true, false) => IniChangeType.Removed,
+        (true, true) when oldValue == newValue => IniChangeType.Unchanged,
+        _ => IniChangeType.Changed,
+      };
 
-            changes.Add(new IniChange(path, changeType, hasOld ? oldValue : null, hasNew ? newValue : null));
-        }
-
-        return changes.ToArray();
+      changes.Add(new IniChange(path, changeType, hasOld ? oldValue : null, hasNew ? newValue : null));
     }
 
-    private static Dictionary<string, string> Parse(string text)
-    {
-        var entries = new Dictionary<string, string>();
-        string? section = null;
+    return changes.ToArray();
+  }
 
-        foreach (var rawLine in text.Split('\n'))
-        {
-            var line = rawLine.Trim().TrimEnd('\r');
+  private static Dictionary<string, string> Parse(string text) {
+    var entries = new Dictionary<string, string>();
+    string? section = null;
 
-            if (line.Length == 0 || line.StartsWith(';') || line.StartsWith('#'))
-            {
-                continue;
-            }
+    foreach (var rawLine in text.Split('\n')) {
+      var line = rawLine.Trim().TrimEnd('\r');
 
-            if (line.StartsWith('[') && line.EndsWith(']'))
-            {
-                section = line[1..^1];
-                continue;
-            }
+      if (line.Length == 0 || line.StartsWith(';') || line.StartsWith('#')) {
+        continue;
+      }
 
-            var separatorIndex = line.IndexOf('=');
-            if (separatorIndex < 0)
-            {
-                continue;
-            }
+      if (line.StartsWith('[') && line.EndsWith(']')) {
+        section = line[1..^1];
+        continue;
+      }
 
-            var key = line[..separatorIndex].Trim();
-            var value = line[(separatorIndex + 1)..].Trim();
-            var escapedKey = EscapePathSegment(key);
-            var path = section is null ? escapedKey : $"{EscapePathSegment(section)}.{escapedKey}";
-            entries[path] = value;
-        }
+      var separatorIndex = line.IndexOf('=');
+      if (separatorIndex < 0) {
+        continue;
+      }
 
-        return entries;
+      var key = line[..separatorIndex].Trim();
+      var value = line[(separatorIndex + 1)..].Trim();
+      var escapedKey = EscapePathSegment(key);
+      var path = section is null ? escapedKey : $"{EscapePathSegment(section)}.{escapedKey}";
+      entries[path] = value;
     }
 
-    // Backslash must be escaped before dot, or a raw trailing backslash in a
-    // section name (e.g. "[a\]") composes with the inserted "." separator into
-    // the same "\." sequence a dot-escape produces, colliding with an unrelated
-    // dotted key in a different (or no) section.
-    private static string EscapePathSegment(string segment) =>
-        segment.Replace("\\", "\\\\").Replace(".", "\\.");
+    return entries;
+  }
+
+  // Backslash must be escaped before dot, or a raw trailing backslash in a
+  // section name (e.g. "[a\]") composes with the inserted "." separator into
+  // the same "\." sequence a dot-escape produces, colliding with an unrelated
+  // dotted key in a different (or no) section.
+  private static string EscapePathSegment(string segment) =>
+      segment.Replace("\\", "\\\\").Replace(".", "\\.");
 }
