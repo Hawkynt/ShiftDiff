@@ -27,7 +27,41 @@ what happened to it on the way" instead of just "what lines differ."
 
 Full spec (goals, use cases, UI, roadmap): [SPEC.md](SPEC.md).
 
-## Desktop application
+[![ShiftDiff comparing two C# files, one method moved and edited](docs/screenshots/workspace-dark.png)](docs/screenshots/workspace-dark.png)
+
+## 🧭 Vision
+
+Line-oriented diff tools answer the wrong question. Move a method and they report a deletion in one
+place and an addition in another; refactor a file and the result is a wall of red and green that
+hides what actually happened.
+
+ShiftDiff treats a diff as a relationship problem instead: where did this block go, and what was done
+to it on the way. Moves, edits, merges and reconstructions are named as such — in the desktop viewer
+and in the CLI, from the same analysis.
+
+## ✨ Features
+
+- Blocks tracked across moves, with the edit applied on the way shown token by token
+- Merges and reconstructions recognised rather than rendered as unrelated deletes and adds
+- The same analysis behind the desktop viewer and the command line
+- A patch engine that can apply what it describes
+- Version-control integration
+
+## 📦 Installation
+
+Download the application or the `shiftdiff` CLI from the [latest release](../../releases/latest) (or a
+`nightly-*` prerelease). See [Building](#-building) to run from source.
+
+## 🚀 Quick start
+
+```bash
+shiftdiff compare old.cs new.cs --mode aggressive
+```
+
+The desktop application opens the same comparison with the panes, the gutter connectors and the move
+arrows shown above.
+
+## 🖼️ Screenshots
 
 A method was moved and its condition edited. Each change block is outlined in
 its own colour, the gutter between the panes brackets each block on both sides
@@ -50,7 +84,7 @@ inputs live in [`docs/showcase`](docs/showcase), and
 [`scripts/capture-showcase.sh`](scripts/capture-showcase.sh) recaptures the real
 window through the UI Showcase workflow.
 
-## Command line
+## ⌨️ Command line
 
 The same analysis drives the CLI. The default output names the moved blocks and
 shows token-level edits inline, instead of rendering a move as delete + add:
@@ -98,7 +132,7 @@ headers, new/deleted file modes), `--format svn` an SVN-compatible one.
 Exit codes: `0` no differences, `1` differences, `2` conflicts, `3` invalid
 input, `4` internal error.
 
-## How it works
+## ⚙️ How it works
 
 The diff engine (`ShiftDiff.Core`) runs a normalize → hash → anchor → block →
 score → classify pipeline:
@@ -127,7 +161,7 @@ score → classify pipeline:
    duplicate-anchor frequency, and the score cutoff between a pure move and a
    moved+edited block.
 
-## Patch engine
+## 🩹 Patch engine
 
 `UnifiedDiffParser` / `UnifiedDiffFormatter` / `PatchApplier` round-trip
 unified diffs, including Git's extended headers (mode changes, renames,
@@ -140,7 +174,7 @@ copies, similarity index, `diff --git` paths) and SVN-style diff export:
 - **Export** the (possibly reconstructed) result back to a unified diff,
   a Git-compatible patch, or an SVN-compatible diff.
 
-## Version control
+## 🔀 Version control
 
 `ShiftDiff.Vcs` puts Git and SVN behind one provider abstraction: repository
 detection, working-tree/working-copy status, changes between revisions, file
@@ -149,7 +183,7 @@ process runner, so the providers are tested without a repository on disk.
 Renames and copies Git reports are carried through as moves rather than as a
 delete/add pair.
 
-## Status
+## 📋 Status
 
 The diff/patch **engine** (`ShiftDiff.Core`) implements the pipeline above —
 line hashing, anchor detection, block building/scoring/classification, split and
@@ -177,7 +211,7 @@ light/dark/system themes with switchable emoji markers.
 editable character-level merge target, and AST-assisted matching. See SPEC.md
 §17 for MVP scope and §18 for the planned versions.
 
-## Layout
+## 📁 Layout
 
 - `src/ShiftDiff.Core` — diff engine (hashing, anchor detection, block matching,
   folder and workspace comparison, patch parsing/application). No UI or VCS
@@ -193,7 +227,14 @@ editable character-level merge target, and AST-assisted matching. See SPEC.md
 Language profiles live in `ShiftDiff.Core` and are independent of the Avalonia UI.
 See [source language support](docs/source-language-support.md) for the extension model.
 
-## Building
+## 🔄 Workflow
+
+TDD/BDD/DDD/SDD: every feature starts from a spec requirement (FR-xxx/AC-xxx
+in SPEC.md), gets a failing test named after the behavior it pins, then the
+implementation that turns it green. Domain terms in code match the spec's
+vocabulary (block, anchor, hunk, confidence, role, etc.).
+
+## 🛠️ Building
 
 ```
 dotnet build
@@ -202,13 +243,6 @@ dotnet run --project src/ShiftDiff.App -- path-a path-b [path-c] [path-d]
 dotnet run --project src/ShiftDiff.Cli -- compare old.cs new.cs
 ```
 
-## Workflow
-
-TDD/BDD/DDD/SDD: every feature starts from a spec requirement (FR-xxx/AC-xxx
-in SPEC.md), gets a failing test named after the behavior it pins, then the
-implementation that turns it green. Domain terms in code match the spec's
-vocabulary (block, anchor, hunk, confidence, role, etc.).
-
 ## ❤️ Support
 
 If this project saves you time or money, consider supporting its development:
@@ -216,6 +250,6 @@ If this project saves you time or money, consider supporting its development:
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/Hawkynt)
 [![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?logo=paypal)](https://www.paypal.me/hawkynt)
 
-## License
+## 📜 License
 
 Licensed under LGPL-3.0-or-later — see [LICENSE](LICENSE).
